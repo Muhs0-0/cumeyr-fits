@@ -9,16 +9,6 @@ interface ExtendedOrder extends Order {
   cost_price?: number;
   selling_price?: number;
   profit?: number;
-  approved_by?: {
-    admin_id: string;
-    admin_name: string;
-    timestamp: string;
-  };
-  deleted_by?: {
-    admin_id: string;
-    admin_name: string;
-    timestamp: string;
-  };
 }
 
 export default function AdminDashboardPage() {
@@ -34,38 +24,72 @@ export default function AdminDashboardPage() {
   const [variantsProduct, setVariantsProduct] = useState<Product | undefined>();
   const [adminName, setAdminName] = useState("");
   const [adminId, setAdminId] = useState("");
+  const [isInitialized, setIsInitialized] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!sessionStorage.getItem("adminAuth")) {
+    console.log("🔷 AdminDashboard useEffect running - checking auth");
+    // Check localStorage first (persists across refresh)
+    const authToken = localStorage.getItem("adminAuth");
+    const name = localStorage.getItem("adminName") || "Admin";
+    const id = localStorage.getItem("adminId") || "";
+
+    console.log("🔷 Auth check:", { authToken, name, id });
+
+    if (!authToken) {
+      console.log("❌ No auth token found - redirecting to login");
       navigate("/admin/login");
       return;
     }
-    const name = sessionStorage.getItem("adminName") || "Admin";
-    const id = sessionStorage.getItem("adminId") || "";
+
+    console.log("✅ Auth token found - setting admin info");
     setAdminName(name);
     setAdminId(id);
+    setIsInitialized(true);
+    
+    console.log("🔷 Fetching orders, products, and analytics");
     fetchOrders();
     fetchProducts();
     fetchAnalytics();
   }, [navigate]);
 
   const fetchOrders = async () => {
-    const res = await fetch(`${API_BASE}/api/admin/orders`);
-    const data = await res.json();
-    setOrders(data);
+    console.log("🔷 Fetching orders from API...");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/orders`);
+      console.log("🔷 Orders response status:", res.status);
+      const data = await res.json();
+      console.log("✅ Orders fetched:", data);
+      setOrders(data);
+    } catch (err) {
+      console.error("❌ Error fetching orders:", err);
+    }
   };
 
   const fetchProducts = async () => {
-    const res = await fetch(`${API_BASE}/api/admin/products`);
-    const data = await res.json();
-    setProducts(data);
+    console.log("🔷 Fetching products from API...");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/products`);
+      console.log("🔷 Products response status:", res.status);
+      const data = await res.json();
+      console.log("✅ Products fetched:", data);
+      setProducts(data);
+    } catch (err) {
+      console.error("❌ Error fetching products:", err);
+    }
   };
 
   const fetchAnalytics = async () => {
-    const res = await fetch(`${API_BASE}/api/admin/analytics`);
-    const data = await res.json();
-    setAnalytics(data);
+    console.log("🔷 Fetching analytics from API...");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/analytics`);
+      console.log("🔷 Analytics response status:", res.status);
+      const data = await res.json();
+      console.log("✅ Analytics fetched:", data);
+      setAnalytics(data);
+    } catch (err) {
+      console.error("❌ Error fetching analytics:", err);
+    }
   };
 
   const handleOrderStatusUpdate = async (orderId: number, status: "confirmed" | "completed" | "cancelled") => {
@@ -136,9 +160,13 @@ export default function AdminDashboardPage() {
   };
 
   const handleLogout = () => {
+    // Clear both sessionStorage and localStorage to ensure complete logout
     sessionStorage.removeItem("adminAuth");
     sessionStorage.removeItem("adminId");
     sessionStorage.removeItem("adminName");
+    localStorage.removeItem("adminAuth");
+    localStorage.removeItem("adminId");
+    localStorage.removeItem("adminName");
     navigate("/");
   };
 

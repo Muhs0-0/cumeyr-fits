@@ -32,9 +32,9 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Connect to MongoDB
-const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGO_URI_ONLINE;
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('Connected to MongoDB'))
+  .then(() => console.log('Connected to MongoDB '))
   .catch(err => console.error('MongoDB connection error', err));
 
 // Admin credentials (env or fallback) - support 2 admins
@@ -47,15 +47,18 @@ const ADMIN2_PASSWORD = process.env.ADMIN2_PASSWORD || 'cumeyr123';
 app.post('/api/admin/login', (req, res) => {
   const { username, password } = req.body;
   
-  // console.log('Login attempt:', { username, password, envAdmin1: ADMIN_USERNAME, envAdmin2: ADMIN2_USERNAME });
+  console.log('🔷 [LOGIN] Attempt with username:', username);
+  console.log('🔷 [LOGIN] Expected credentials - Admin1:', ADMIN_USERNAME, 'Admin2:', ADMIN2_USERNAME);
   
   if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    console.log('✅ [LOGIN] Admin1 authenticated:', ADMIN_USERNAME);
     return res.json({ success: true, admin_id: 'admin1', admin_name: ADMIN_USERNAME, message: 'Login successful' });
   }
   if (username === ADMIN2_USERNAME && password === ADMIN2_PASSWORD) {
+    console.log('✅ [LOGIN] Admin2 authenticated:', ADMIN2_USERNAME);
     return res.json({ success: true, admin_id: 'admin2', admin_name: ADMIN2_USERNAME, message: 'Login successful' });
   }
-  console.log('Login failed - invalid credentials');
+  console.log('❌ [LOGIN] Failed - invalid credentials');
   return res.status(401).json({ success: false, message: 'Invalid credentials' });
 });
 
@@ -155,28 +158,34 @@ app.post('/api/orders', async (req, res) => {
 
 // Admin: get orders
 app.get('/api/admin/orders', async (req, res) => {
+  console.log('🔷 [GET /api/admin/orders] Request received');
   try {
     const orders = await Order.find().sort({ created_at: -1 }).lean();
+    console.log('🔷 [GET /api/admin/orders] Found', orders.length, 'orders');
     // Enrich with variant pricing and map _id to id
     const enriched = await Promise.all(orders.map(async (o) => {
       const pv = await Variant.findById(o.variant_id).select('cost_price selling_price').lean();
       return { ...o, id: o._id, cost_price: pv?.cost_price || 0, selling_price: pv?.selling_price || 0, profit: ((pv?.selling_price || 0) - (pv?.cost_price || 0)) * o.quantity };
     }));
+    console.log('✅ [GET /api/admin/orders] Returning', enriched.length, 'orders');
     return res.json(enriched);
   } catch (err) {
-    console.error(err);
+    console.error('❌ [GET /api/admin/orders] Error:', err);
     return res.status(500).json({ error: 'Failed to fetch orders' });
   }
 });
 
 // Admin analytics
 app.get('/api/admin/analytics', async (req, res) => {
+  console.log('🔷 [GET /api/admin/analytics] Request received');
   try {
     const totalOrders = await Order.countDocuments();
     const approvedOrders = await Order.countDocuments({ status: 'completed' });
     const cancelledOrders = await Order.countDocuments({ status: 'cancelled' });
     const pendingOrders = await Order.countDocuments({ $or: [{ status: 'pending' }, { status: 'confirmed' }] });
     const totalProducts = await Product.countDocuments({ is_active: true });
+
+    console.log('🔷 [GET /api/admin/analytics] Counts - Orders:', totalOrders, 'Products:', totalProducts);
 
     const revenueAgg = await Order.aggregate([
       { $match: { status: 'completed' } },
@@ -203,6 +212,7 @@ app.get('/api/admin/analytics', async (req, res) => {
       { $project: { 'p.name': 1, color: 1, stock_quantity: 1, product_id: '$product', id: '$_id' } }
     ]);
 
+    console.log('✅ [GET /api/admin/analytics] Revenue:', revenueAgg[0]?.total_revenue, 'Inventory Value:', inventoryAgg[0]?.inventory_value);
     return res.json({
       total_orders: totalOrders,
       approved_orders: approvedOrders,
@@ -216,7 +226,7 @@ app.get('/api/admin/analytics', async (req, res) => {
       out_of_stock_variants: outOfStockVariants,
     });
   } catch (err) {
-    console.error(err);
+    console.error('❌ [GET /api/admin/analytics] Error:', err);
     return res.status(500).json({ error: 'Failed to fetch analytics' });
   }
 });

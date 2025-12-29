@@ -13,27 +13,36 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    console.log("🔷 Login attempt with username:", username);
 
     const API_BASE = import.meta.env.VITE_API_BASE || "";
 
     try {
+      console.log("🔷 Sending login request to:", `${API_BASE}/api/admin/login`);
       const res = await fetch(`${API_BASE}/api/admin/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
 
+      console.log("🔷 Login response status:", res.status);
       const data = await res.json();
+      console.log("🔷 Login response data:", data);
 
       if (data.success) {
-        sessionStorage.setItem("adminAuth", "true");
-        sessionStorage.setItem("adminId", data.admin_id);
-        sessionStorage.setItem("adminName", data.admin_name);
+        console.log("✅ Login successful!");
+        // Use localStorage for persistence across page refresh
+        localStorage.setItem("adminAuth", "true");
+        localStorage.setItem("adminId", data.admin_id);
+        localStorage.setItem("adminName", data.admin_name);
+        console.log("✅ Auth saved to localStorage:", { admin_id: data.admin_id, admin_name: data.admin_name });
         navigate("/admin/dashboard");
       } else {
+        console.log("❌ Login failed - invalid credentials");
         setError("Invalid credentials");
       }
     } catch (err) {
+      console.error("❌ Login error:", err);
       setError("Login failed. Please try again.");
     } finally {
       setLoading(false);
