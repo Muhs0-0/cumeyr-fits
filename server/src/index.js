@@ -336,8 +336,8 @@ app.delete('/api/admin/orders/:id', async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
     // Only allow deletion of completed orders
-    if (order.status !== 'completed') {
-      return res.status(400).json({ error: 'Only approved (completed) orders can be deleted' });
+    if (order.status === 'completed') {
+      return res.status(400).json({ error: 'Only approved (completed) orders cannot be deleted' });
     }
 
     // Restore stock to inventory
