@@ -38,12 +38,12 @@ export default function Navbar({ selectedCategory, onCategoryChange }: NavbarPro
               ))}
             </div>
             
-            <Link
+            {/* <Link
               to="/admin/login"
               className="btn-secondary text-sm"
             >
               Login as Admin
-            </Link>
+            </Link> */}
           </div>
         </div>
         
