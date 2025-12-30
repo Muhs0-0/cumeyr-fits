@@ -428,7 +428,7 @@ export default function AdminDashboardPage() {
                             </button>
                           </div>
                         )}
-                        {order.status === "completed" && (
+                        {order.status !== "completed" && (
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleDeleteOrder(order.id as unknown as number)}
