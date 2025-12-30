@@ -11,7 +11,15 @@ const Variant = require('./models/Variant');
 const Order = require('./models/Order');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5174',
+    'cumeyr-fits-production.up.railway.app'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // Ensure uploads directory exists
