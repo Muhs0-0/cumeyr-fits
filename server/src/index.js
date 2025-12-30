@@ -17,7 +17,7 @@ app.use(cors({
     'http://localhost:3000',
     'http://localhost:5174',
     'https://cumeyr-fits-production.up.railway.app',
-    'https://cumeyr-fits.vercel.app'
+    'https://qaf-fits.vercel.app'
   ],
   credentials: true
 }));
