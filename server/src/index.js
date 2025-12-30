@@ -3,8 +3,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const { v2: cloudinary } = require('cloudinary');
+const streamifier = require('streamifier');
 
 const Product = require('./models/Product');
 const Variant = require('./models/Variant');
@@ -16,28 +16,25 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:3000',
     'http://localhost:5174',
-    'cumeyr-fits-production.up.railway.app'
+    'https://cumeyr-fits-production.up.railway.app'
   ],
   credentials: true
 }));
 app.use(express.json());
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-app.use('/files', express.static(uploadsDir));
-
-// Multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const unique = Date.now() + '-' + file.originalname.replace(/\s+/g, '-');
-    cb(null, unique);
-  }
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
-const upload = multer({ storage });
+
+// Use memory storage (no local files)
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
 
 // Connect to MongoDB
 const MONGO_URI = process.env.MONGO_URI_ONLINE;
@@ -45,7 +42,7 @@ mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Connected to MongoDB '))
   .catch(err => console.error('MongoDB connection error', err));
 
-// Admin credentials (env or fallback) - support 2 admins
+// Admin credentials
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'muhsoo';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'muhsoo123';
 const ADMIN2_USERNAME = process.env.ADMIN2_USERNAME || 'cumeyr';
@@ -54,10 +51,9 @@ const ADMIN2_PASSWORD = process.env.ADMIN2_PASSWORD || 'cumeyr123';
 // Admin login
 app.post('/api/admin/login', (req, res) => {
   const { username, password } = req.body;
-  
+
   console.log('🔷 [LOGIN] Attempt with username:', username);
-  console.log('🔷 [LOGIN] Expected credentials - Admin1:', ADMIN_USERNAME, 'Admin2:', ADMIN2_USERNAME);
-  
+
   if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
     console.log('✅ [LOGIN] Admin1 authenticated:', ADMIN_USERNAME);
     return res.json({ success: true, admin_id: 'admin1', admin_name: ADMIN_USERNAME, message: 'Login successful' });
@@ -70,33 +66,32 @@ app.post('/api/admin/login', (req, res) => {
   return res.status(401).json({ success: false, message: 'Invalid credentials' });
 });
 
-// Upload endpoint
-app.post('/api/upload', upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file provided' });
-  const key = `files/${req.file.filename}`;
-  // Return full URL so frontend can display image correctly
-  const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`;
-  return res.json({ url: `${backendUrl}/${key}` });
-});
-
-// Get products
-app.get('/api/products', async (req, res) => {
+// Upload endpoint - NOW USING CLOUDINARY
+app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
-    const { category } = req.query;
-    const match = { is_active: true };
-    if (category && category !== 'all') match.category = category;
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
 
-    // Find products and ensure they have at least one variant
-    const products = await Product.find(match).sort({ created_at: -1 }).lean();
-    // Attach first variant count existence
-    const result = await Promise.all(products.map(async (p) => {
-      const count = await Variant.countDocuments({ product: p._id });
-      return count > 0 ? { ...p, id: p._id } : null;
-    }));
-    return res.json(result.filter(Boolean));
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Failed to fetch products' });
+    // Upload to Cloudinary
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'cumeyr-fits',
+          resource_type: 'auto'
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+
+      streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+    });
+
+    console.log('✅ Image uploaded to Cloudinary:', result.secure_url);
+    return res.json({ url: result.secure_url });
+  } catch (error) {
+    console.error('❌ Upload error:', error);
+    return res.status(500).json({ error: 'Upload failed' });
   }
 });
 
@@ -199,11 +194,11 @@ app.get('/api/admin/analytics', async (req, res) => {
       { $match: { status: 'completed' } },
       { $lookup: { from: 'variants', localField: 'variant_id', foreignField: '_id', as: 'pv' } },
       { $unwind: { path: '$pv', preserveNullAndEmptyArrays: true } },
-      { $group: { _id: null, total_revenue: { $sum: { $multiply: [ '$pv.selling_price', '$quantity' ] } }, total_profit: { $sum: { $multiply: [ { $subtract: [ '$pv.selling_price', '$pv.cost_price' ] }, '$quantity' ] } } } }
+      { $group: { _id: null, total_revenue: { $sum: { $multiply: ['$pv.selling_price', '$quantity'] } }, total_profit: { $sum: { $multiply: [{ $subtract: ['$pv.selling_price', '$pv.cost_price'] }, '$quantity'] } } } }
     ]);
 
     const inventoryAgg = await Variant.aggregate([
-      { $group: { _id: null, inventory_value: { $sum: { $multiply: [ '$cost_price', '$stock_quantity' ] } } } }
+      { $group: { _id: null, inventory_value: { $sum: { $multiply: ['$cost_price', '$stock_quantity'] } } } }
     ]);
 
     const lowStockVariants = await Variant.aggregate([

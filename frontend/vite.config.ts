@@ -4,19 +4,6 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  server: {
-    allowedHosts: true,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
-      },
-      '/files': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
-      }
-    }
-  },
   build: {
     chunkSizeWarningLimit: 5000,
   },
@@ -24,8 +11,5 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-  },
-  preview: {
-    allowedHosts: true,
   },
 });

@@ -38,6 +38,17 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
       setImageUrl(product.image_url || "");
       setImagePreview(product.image_url || "");
       setIsActive(product.is_active);
+      
+      // When editing, load the product's size range (should be all category sizes)
+      // But don't allow modifying it since variants depend on it
+      if (product.available_sizes) {
+        try {
+          const sizes = JSON.parse(product.available_sizes);
+          setVariantSizes(sizes);
+        } catch {
+          setVariantSizes([]);
+        }
+      }
     }
   }, [product]);
 
@@ -76,13 +87,14 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
     e.preventDefault();
 
     if (!product) {
-      // For new products, require variant fields
-      if (!variantColor.trim()) {
-        alert("Please enter a color for the first variant");
+      // For new products, validate sizes and variant fields
+      if (variantSizes.length === 0) {
+        alert("Please select at least one size for the first variant");
         return;
       }
-      if (variantSizes.length === 0) {
-        alert("Please select at least one size for this variant");
+      
+      if (!variantColor.trim()) {
+        alert("Please enter a color for the first variant");
         return;
       }
       if (!costPrice || parseFloat(costPrice) <= 0) {
@@ -115,12 +127,18 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
         finalImageUrl = uploadData.url;
       }
 
+      // Get ALL possible sizes for this category (not just selected ones)
+      const allCategorySizes = getSizeOptions();
+      
       const data = {
         name,
         description,
         category,
         image_url: finalImageUrl,
         is_active: isActive,
+        // IMPORTANT: Save ALL possible sizes for this category to product (not just first variant's sizes)
+        // This allows future variants to choose from the full size range
+        available_sizes: JSON.stringify(allCategorySizes),
         // First variant data (only for new products)
         ...(!product && {
           first_variant: {
@@ -129,6 +147,7 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
             selling_price: parseFloat(sellingPrice),
             stock_quantity: parseInt(stockQuantity) || 10,
             image_url: finalImageUrl,
+            // The variant only gets the sizes that were actually selected
             available_sizes: JSON.stringify(variantSizes),
           }
         })
@@ -214,10 +233,13 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
 
           <div>
             <label className="block text-white font-medium mb-2">
-              Select Available Sizes <span className="text-red-400">*</span>
+              {product ? "Product Size Range" : "Select Sizes for First Variant"} <span className="text-red-400">*</span>
             </label>
             <p className="text-gray-400 text-sm mb-3">
-              Choose which sizes this variant will be available in
+              {product 
+                ? "These are all possible sizes for this product category. Individual variants choose which sizes they stock."
+                : "Choose which sizes this color variant will be available in"
+              }
             </p>
             <div className="bg-gradient-to-r from-green-900/20 to-gray-800 rounded-lg p-4 border border-green-500/20">
               <div className="flex flex-wrap gap-2">
@@ -225,20 +247,24 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
                   <button
                     key={size}
                     type="button"
-                    onClick={() => toggleVariantSize(size)}
+                    onClick={() => !product && toggleVariantSize(size)}
+                    disabled={!!product}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
                       variantSizes.includes(size)
                         ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
+                    } ${product ? 'cursor-not-allowed opacity-75' : ''}`}
                   >
                     {variantSizes.includes(size) && <Check size={16} />}
                     {size}
                   </button>
                 ))}
               </div>
-              {variantSizes.length === 0 && (
+              {!product && variantSizes.length === 0 && (
                 <p className="text-yellow-400 text-sm mt-3">⚠ Please select at least one size</p>
+              )}
+              {product && (
+                <p className="text-blue-400 text-sm mt-3">ℹ️ Size range is fixed after product creation. Add variants with specific sizes in "Manage Variants".</p>
               )}
             </div>
           </div>
@@ -395,7 +421,7 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
           <div className="flex gap-3 pt-4">
             <button
               type="submit"
-              disabled={loading || variantSizes.length === 0}
+              disabled={loading || (!product && variantSizes.length === 0)}
               className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-lg shadow-green-500/30 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Saving..." : product ? "Update Product" : "Add Product"}
