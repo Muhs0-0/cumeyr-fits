@@ -129,6 +129,43 @@ app.get('/api/products/:id/variants', async (req, res) => {
   }
 });
 
+// Public: Get all active products (for customers)
+app.get('/api/products', async (req, res) => {
+  try {
+    const { category } = req.query;
+    
+    // Build query - only show active products with available stock
+    const query = { is_active: true };
+    if (category) query.category = category;
+
+    const products = await Product.find(query).sort({ created_at: -1 }).lean();
+    
+    // For each product, check if it has any variants with stock > 0
+    const productsWithStock = await Promise.all(
+      products.map(async (p) => {
+        const variantsWithStock = await Variant.countDocuments({
+          product: p._id,
+          stock_quantity: { $gt: 0 }
+        });
+        
+        // Only return products that have at least one variant with stock
+        if (variantsWithStock > 0) {
+          return { ...p, id: p._id };
+        }
+        return null;
+      })
+    );
+
+    // Filter out null values (products without stock)
+    const availableProducts = productsWithStock.filter(p => p !== null);
+    
+    return res.json(availableProducts);
+  } catch (err) {
+    console.error('Error fetching products:', err);
+    return res.status(500).json({ error: 'Failed to fetch products' });
+  }
+});
+
 // Check variant stock
 app.get('/api/variants/:id/stock', async (req, res) => {
   try {
