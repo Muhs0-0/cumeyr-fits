@@ -69,7 +69,18 @@ app.post('/api/admin/login', (req, res) => {
 // Upload endpoint - NOW USING CLOUDINARY
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    console.log('🔷 Upload request received');
+    console.log('🔷 File:', req.file ? req.file.originalname : 'NO FILE');
+    console.log('🔷 Cloudinary config:', {
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'SET' : 'MISSING',
+      api_key: process.env.CLOUDINARY_API_KEY ? 'SET' : 'MISSING',
+      api_secret: process.env.CLOUDINARY_API_SECRET ? 'SET' : 'MISSING'
+    });
+
+    if (!req.file) {
+      console.log('❌ No file in request');
+      return res.status(400).json({ error: 'No file provided' });
+    }
 
     // Upload to Cloudinary
     const result = await new Promise((resolve, reject) => {
@@ -79,8 +90,13 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
           resource_type: 'auto'
         },
         (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
+          if (error) {
+            console.error('❌ Cloudinary error:', error);
+            reject(error);
+          } else {
+            console.log('✅ Cloudinary success:', result.secure_url);
+            resolve(result);
+          }
         }
       );
 
@@ -91,7 +107,11 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     return res.json({ url: result.secure_url });
   } catch (error) {
     console.error('❌ Upload error:', error);
-    return res.status(500).json({ error: 'Upload failed' });
+    console.error('❌ Error details:', error.message, error.stack);
+    return res.status(500).json({
+      error: 'Upload failed',
+      details: error.message
+    });
   }
 });
 
