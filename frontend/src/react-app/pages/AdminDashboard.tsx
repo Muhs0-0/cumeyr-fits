@@ -24,7 +24,7 @@ export default function AdminDashboardPage() {
   const [variantsProduct, setVariantsProduct] = useState<Product | undefined>();
   const [adminName, setAdminName] = useState("");
   const [adminId, setAdminId] = useState("");
-  const [isInitialized, setIsInitialized] = useState(false);
+  // const [isInitialized, setIsInitialized] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export default function AdminDashboardPage() {
     console.log("✅ Auth token found - setting admin info");
     setAdminName(name);
     setAdminId(id);
-    setIsInitialized(true);
+    // setIsInitialized(true);
     
     console.log("🔷 Fetching orders, products, and analytics");
     fetchOrders();
