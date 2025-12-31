@@ -8,15 +8,15 @@ interface ProductModalProps {
   onSave: () => void;
 }
 
-const FOOTWEAR_SIZES = ['39', '40', '41', '42', '43', '44', '45', '46'];
-const APPAREL_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-const ACCESSORY_SIZES = ['One Size'];
+const SLIDES_SIZES = ['39', '40', '41', '42', '43', '44', '45', '46'];
+const OPENS_SIZES = ['39', '40', '41', '42', '43', '44', '45', '46'];
+const SNEAKERS_SIZES = ['39', '40', '41', '42', '43', '44', '45', '46'];
 
 export default function ProductModal({ product, onClose, onSave }: ProductModalProps) {
   const API_BASE = import.meta.env.VITE_API_BASE || "";
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Footwear");
+  const [category, setCategory] = useState("Slides");
   const [imageUrl, setImageUrl] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -68,12 +68,14 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
 
   const getSizeOptions = () => {
     switch (category) {
-      case 'Footwear':
-        return FOOTWEAR_SIZES;
-      case 'Apparel':
-        return APPAREL_SIZES;
+      case 'Slides':
+        return SLIDES_SIZES;
+      case 'Opens':
+        return OPENS_SIZES;
+      case 'Sneakers':
+        return SNEAKERS_SIZES;
       default:
-        return ACCESSORY_SIZES;
+        return SLIDES_SIZES;
     }
   };
 
@@ -257,9 +259,9 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
               required
               disabled={!!product} // Don't allow category change when editing
             >
-              <option value="Footwear">Footwear</option>
-              <option value="Apparel">Apparel</option>
-              <option value="Accessories">Accessories</option>
+              <option value="Slides">Slides</option>
+              <option value="Opens">Opens</option>
+              <option value="Sneakers">Sneakers</option>
             </select>
             {product && (
               <p className="text-gray-400 text-sm mt-1">Category cannot be changed after product creation</p>
