@@ -16,7 +16,53 @@ interface OrderModalProps {
 }
 
 const KENYAN_COUNTIES = [
+  "Baringo",
+  "Bomet",
+  "Bungoma",
+  "Busia",
+  "Elgeyo Marakwet",
+  "Embu",
   "Garissa",
+  "Homa Bay",
+  "Isiolo",
+  "Kajiado",
+  "Kakamega",
+  "Kericho",
+  "Kiambu",
+  "Kilifi",
+  "Kirinyaga",
+  "Kisii",
+  "Kisumu",
+  "Kitui",
+  "Kwale",
+  "Laikipia",
+  "Lamu",
+  "Machakos",
+  "Makueni",
+  "Mandera",
+  "Marsabit",
+  "Meru",
+  "Migori",
+  "Mombasa",
+  "Murang'a",
+  "Nairobi",
+  "Nakuru",
+  "Nandi",
+  "Narok",
+  "Nyamira",
+  "Nyandarua",
+  "Nyeri",
+  "Samburu",
+  "Siaya",
+  "Taita Taveta",
+  "Tana River",
+  "Tharaka Nithi",
+  "Trans Nzoia",
+  "Turkana",
+  "Uasin Gishu",
+  "Vihiga",
+  "Wajir",
+  "West Pokot",
 ];
 
 // Validate Kenyan phone number
@@ -40,7 +86,7 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
   const [quantity, setQuantity] = useState(1);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneError, setPhoneError] = useState("");
-  const [country, setCountry] = useState("Nairobi");
+  const [country, setCountry] = useState(""); // FIXED: Changed from "Nairobi" to empty string
   const [loading, setLoading] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [allImages, setAllImages] = useState<string[]>([]);
@@ -437,12 +483,21 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
                   className="input-field w-full"
                   required
                 >
+                  <option value="">Select county</option>
                   {KENYAN_COUNTIES.map((c) => (
                     <option key={c} value={c}>
                       {c}
                     </option>
                   ))}
                 </select>
+                {country && country !== "Garissa" && (
+                  <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 mt-3">
+                    <p className="text-blue-400 text-sm">
+                      ℹ️ <strong>Delivery Notice:</strong> Orders to {country} may take more than one day to arrive. 
+                      Please wait for a call from us to confirm delivery details.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>
