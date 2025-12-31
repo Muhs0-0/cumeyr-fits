@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { X, Plus, Trash2, DollarSign, Edit3, Save, AlertTriangle } from "lucide-react";
+import { X, Plus, Trash2, DollarSign, Edit3, Save, AlertTriangle, Edit2 } from "lucide-react";
 import type { Product, ProductVariant } from "@/shared/types";
 import VariantModal from "./VariantModal";
+import EditVariantModal from "./EditVariantModal";
 
 interface ManageVariantsModalProps {
   product: Product;
@@ -12,6 +13,7 @@ export default function ManageVariantsModal({ product, onClose }: ManageVariants
   const API_BASE = import.meta.env.VITE_API_BASE || "";
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingStock, setEditingStock] = useState<{ [key: number]: number }>({});
 
@@ -35,6 +37,10 @@ export default function ManageVariantsModal({ product, onClose }: ManageVariants
 
   const handleAddVariant = () => {
     setShowAddModal(true);
+  };
+
+  const handleEditVariant = (variant: ProductVariant) => {
+    setEditingVariant(variant);
   };
 
   const handleSaveVariant = () => {
@@ -108,9 +114,9 @@ export default function ManageVariantsModal({ product, onClose }: ManageVariants
           <div className="bg-gradient-to-r from-green-900/30 to-gray-800 rounded-lg p-4 mb-6 border border-green-500/30">
             <h3 className="text-white font-semibold mb-2">Inventory Management:</h3>
             <ul className="text-gray-300 text-sm space-y-1 list-disc list-inside">
-              <li>Click "Edit Stock" to adjust inventory levels for each color variant</li>
+              <li>Click "Edit" to change a variant's color, sizes, prices, stock, and image</li>
+              <li>Quick stock adjustments available with "Edit Stock" button</li>
               <li>Low stock alerts (less than 5 items) show automatically</li>
-              <li>When you confirm an order, stock decreases automatically</li>
               <li>Add new color variants with the "Add Variant" button</li>
             </ul>
           </div>
@@ -162,7 +168,7 @@ export default function ManageVariantsModal({ product, onClose }: ManageVariants
                     )}
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-3">
-                        <div>
+                        <div className="flex-1">
                           <h4 className="text-white font-semibold text-lg">
                             {variant.color}
                           </h4>
@@ -170,13 +176,22 @@ export default function ManageVariantsModal({ product, onClose }: ManageVariants
                             Sizes: {getSizesDisplay(variant)}
                           </p>
                         </div>
-                        <button
-                          onClick={() => handleDeleteVariant(variant.id)}
-                          className="text-red-400 hover:text-red-300 transition-colors"
-                          title="Delete variant"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditVariant(variant)}
+                            className="text-blue-400 hover:text-blue-300 transition-colors"
+                            title="Edit variant"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteVariant(variant.id)}
+                            className="text-red-400 hover:text-red-300 transition-colors"
+                            title="Delete variant"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="space-y-2 bg-gradient-to-r from-green-900/20 to-gray-700/50 rounded-lg p-3 border border-green-500/20 mb-3">
@@ -276,6 +291,15 @@ export default function ManageVariantsModal({ product, onClose }: ManageVariants
         <VariantModal
           product={product}
           onClose={() => setShowAddModal(false)}
+          onSave={handleSaveVariant}
+        />
+      )}
+
+      {editingVariant && (
+        <EditVariantModal
+          product={product}
+          variant={editingVariant}
+          onClose={() => setEditingVariant(null)}
           onSave={handleSaveVariant}
         />
       )}

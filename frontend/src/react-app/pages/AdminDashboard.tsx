@@ -102,24 +102,6 @@ export default function AdminDashboardPage() {
     fetchAnalytics();
   };
 
-  const handleDeleteOrder = async (orderId: number) => {
-    if (!confirm("Are you sure you want to delete this order? This will restore inventory.")) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/orders/${orderId}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ admin_id: adminId, admin_name: adminName }),
-      });
-      if (res.ok) {
-        fetchOrders();
-        fetchAnalytics();
-      } else {
-        alert("Failed to delete order");
-      }
-    } catch (err) {
-      alert("Error deleting order");
-    }
-  };
 
   const handleDeleteProduct = async (productId: number) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
@@ -428,17 +410,7 @@ export default function AdminDashboardPage() {
                             </button>
                           </div>
                         )}
-                        {order.status === "cancelled" && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleDeleteOrder(order.id as unknown as number)}
-                              className="flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-all"
-                            >
-                              <Trash2 size={16} />
-                              Delete Order
-                            </button>
-                          </div>
-                        )}
+                        
                       </div>
                     </div>
                   </div>

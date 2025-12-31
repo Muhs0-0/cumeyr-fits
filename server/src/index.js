@@ -134,13 +134,13 @@ app.get('/api/products/:id/variants', async (req, res) => {
 app.get('/api/products', async (req, res) => {
   try {
     const { category } = req.query;
-    
+
     // Build query - only show active products with available stock
     const query = { is_active: true };
     if (category) query.category = category;
 
     const products = await Product.find(query).sort({ created_at: -1 }).lean();
-    
+
     // For each product, check if it has any variants with stock > 0
     const productsWithStock = await Promise.all(
       products.map(async (p) => {
@@ -148,7 +148,7 @@ app.get('/api/products', async (req, res) => {
           product: p._id,
           stock_quantity: { $gt: 0 }
         });
-        
+
         // Only return products that have at least one variant with stock
         if (variantsWithStock > 0) {
           return { ...p, id: p._id };
@@ -159,7 +159,7 @@ app.get('/api/products', async (req, res) => {
 
     // Filter out null values (products without stock)
     const availableProducts = productsWithStock.filter(p => p !== null);
-    
+
     return res.json(availableProducts);
   } catch (err) {
     console.error('Error fetching products:', err);
@@ -408,6 +408,8 @@ app.patch('/api/admin/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const data = req.body;
+
+    // Update the product
     await Product.findByIdAndUpdate(id, {
       name: data.name,
       description: data.description,
@@ -416,6 +418,98 @@ app.patch('/api/admin/products/:id', async (req, res) => {
       available_sizes: data.available_sizes || '[]',
       is_active: data.is_active ? true : false,
     });
+
+    // If available_sizes changed, update ALL variants to ONLY have the new sizes
+    if (data.available_sizes) {
+      try {
+        const newProductSizes = JSON.parse(data.available_sizes);
+
+        // Get all variants for this product
+        const variants = await Variant.find({ product: id });
+
+        console.log(`🔷 Updating ${variants.length} variants with new sizes:`, newProductSizes);
+
+        // Update each variant - REPLACE their sizes with the new product sizes
+        for (const variant of variants) {
+          await Variant.findByIdAndUpdate(variant._id, {
+            available_sizes: JSON.stringify(newProductSizes)
+          });
+        }
+
+        console.log(`✅ Updated sizes for ${variants.length} variants of product ${id}`);
+      } catch (parseError) {
+        console.error('❌ Error parsing/updating variant sizes:', parseError);
+      }
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update product' });
+  }
+});
+// Add this NEW endpoint for updating variants
+app.patch('/api/admin/variants/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+
+    await Variant.findByIdAndUpdate(id, {
+      color: data.color,
+      cost_price: data.cost_price,
+      selling_price: data.selling_price,
+      stock_quantity: data.stock_quantity,
+      image_url: data.image_url,
+      available_sizes: data.available_sizes
+    });
+
+    console.log(`✅ Updated variant ${id}`);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Error updating variant:', err);
+    return res.status(500).json({ error: 'Failed to update variant' });
+  }
+});
+
+// Update the product PATCH endpoint (REPLACE the existing one)
+app.patch('/api/admin/products/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+
+    // Update the product
+    await Product.findByIdAndUpdate(id, {
+      name: data.name,
+      description: data.description,
+      category: data.category,
+      image_url: data.image_url,
+      available_sizes: data.available_sizes || '[]',
+      is_active: data.is_active ? true : false,
+    });
+
+    // If available_sizes changed, update ALL variants to have the new product sizes
+    if (data.available_sizes) {
+      try {
+        const newProductSizes = JSON.parse(data.available_sizes);
+
+        // Get all variants for this product
+        const variants = await Variant.find({ product: id });
+
+        console.log(`🔷 Updating ${variants.length} variants with new sizes:`, newProductSizes);
+
+        // Update each variant - REPLACE their sizes with new product sizes
+        for (const variant of variants) {
+          await Variant.findByIdAndUpdate(variant._id, {
+            available_sizes: JSON.stringify(newProductSizes)
+          });
+        }
+
+        console.log(`✅ Updated sizes for ${variants.length} variants of product ${id}`);
+      } catch (parseError) {
+        console.error('❌ Error parsing/updating variant sizes:', parseError);
+      }
+    }
+
     return res.json({ success: true });
   } catch (err) {
     console.error(err);

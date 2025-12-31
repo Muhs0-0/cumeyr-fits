@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, AlertTriangle } from "lucide-react";
+import { X, AlertTriangle, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import type { Product, ProductVariant } from "@/shared/types";
 
 interface OrderModalProps {
@@ -16,54 +16,7 @@ interface OrderModalProps {
 }
 
 const KENYAN_COUNTIES = [
-  "Baringo",
-  "Bomet",
-  "Bungoma",
-  "Baricho",
-  "Embu",
   "Garissa",
-  "Homa Bay",
-  "Isiolo",
-  "Kajiado",
-  "Kakamega",
-  "Kamba",
-  "Kericho",
-  "Kiambu",
-  "Kilifi",
-  "Kirinyaga",
-  "Kisii",
-  "Kisumu",
-  "Kitui",
-  "Kwale",
-  "Laikipia",
-  "Lamu",
-  "Machakos",
-  "Makueni",
-  "Mandera",
-  "Marsabit",
-  "Meru",
-  "Migori",
-  "Mombasa",
-  "Murang'a",
-  "Muranga",
-  "Nairobi",
-  "Nakuru",
-  "Nandi",
-  "Narok",
-  "Nyamira",
-  "Nyandarua",
-  "Nyeri",
-  "Samburu",
-  "Siaya",
-  "Taita Taveta",
-  "Tana River",
-  "Tharaka Nithi",
-  "Trans Nzoia",
-  "Turkana",
-  "Uasin Gishu",
-  "Vihiga",
-  "Wajir",
-  "West Pokot",
 ];
 
 // Validate Kenyan phone number
@@ -89,13 +42,25 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
   const [phoneError, setPhoneError] = useState("");
   const [country, setCountry] = useState("Nairobi");
   const [loading, setLoading] = useState(false);
-  const [displayImage, setDisplayImage] = useState(product.image_url);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [allImages, setAllImages] = useState<string[]>([]);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/products/${product.id}/variants`)
       .then((res) => res.json())
       .then((data: ProductVariant[]) => {
         setVariants(data);
+        
+        // Collect all unique images (product image + all variant images)
+        const images = [product.image_url];
+        data.forEach((v) => {
+          if (v.image_url && !images.includes(v.image_url)) {
+            images.push(v.image_url);
+          }
+        });
+        setAllImages(images);
+        
         // Auto-select first color if available
         const colors = [...new Set(data.map((v) => v.color))];
         if (colors.length > 0 && colors[0]) {
@@ -103,16 +68,6 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
         }
       });
   }, [product.id]);
-
-  useEffect(() => {
-    // Update display image when color changes
-    if (selectedColor) {
-      const variant = variants.find((v) => v.color === selectedColor);
-      if (variant?.image_url) {
-        setDisplayImage(variant.image_url);
-      }
-    }
-  }, [selectedColor, variants]);
 
   // Get unique colors from variants
   const availableColors = [...new Set(variants.map((v) => v.color))];
@@ -142,7 +97,34 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
   const stockQuantity = selectedVariant?.stock_quantity || 0;
 
   // Calculate max quantity user can order
-  const maxQuantity = Math.min(stockQuantity, 10);
+  const maxQuantity = stockQuantity;
+
+  const nextImage = () => {
+    const newIndex = (currentImageIndex + 1) % allImages.length;
+    setCurrentImageIndex(newIndex);
+    updateColorBasedOnImage(newIndex);
+  };
+
+  const prevImage = () => {
+    const newIndex = (currentImageIndex - 1 + allImages.length) % allImages.length;
+    setCurrentImageIndex(newIndex);
+    updateColorBasedOnImage(newIndex);
+  };
+
+  const updateColorBasedOnImage = (imageIndex: number) => {
+    const imageUrl = allImages[imageIndex];
+    // Find the variant that matches this image
+    const matchingVariant = variants.find((v) => v.image_url === imageUrl);
+    if (matchingVariant) {
+      setSelectedColor(matchingVariant.color);
+      setSelectedSize(""); // Reset size when color changes
+      setQuantity(1); // Reset quantity
+    }
+  };
+
+  const toggleFullScreen = () => {
+    setIsFullScreen(!isFullScreen);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,228 +156,352 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-      <div className="bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-green-500/20">
-        <div className="sticky top-0 bg-gradient-to-r from-green-600 to-green-500 p-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">Place Order</h2>
+    <>
+      {/* Full Screen Image Viewer */}
+      {isFullScreen && (
+        <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center">
           <button
-            onClick={onClose}
-            className="text-white hover:text-gray-200 transition-colors"
+            onClick={toggleFullScreen}
+            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors z-10 bg-black/50 rounded-full p-2"
           >
-            <X size={24} />
+            <X size={32} />
           </button>
-        </div>
 
-        <div className="p-6">
-          <div className="mb-6">
+          <div className="relative w-full h-full flex items-center justify-center p-4">
             <img
-              src={displayImage}
+              src={allImages[currentImageIndex] || product.image_url}
               alt={product.name}
-              className="w-full h-64 object-cover rounded-lg transition-all duration-300"
+              className="max-w-full max-h-full object-contain"
             />
-            <div className="flex items-start justify-between mt-4">
-              <div>
-                <h3 className="text-xl font-semibold text-white">{product.name}</h3>
-                <p className="text-gray-400 mt-2">{product.description}</p>
-              </div>
-              {sellingPrice !== null && (
-                <div className="bg-gradient-to-r from-green-600 to-green-500 rounded-lg px-4 py-2 ml-4">
-                  <p className="text-white font-bold text-xl">${sellingPrice.toFixed(2)}</p>
-                </div>
-              )}
-            </div>
-          </div>
 
-          {selectedVariant && stockQuantity < 5 && stockQuantity > 0 && (
-            <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4 mb-4 flex items-start gap-3">
-              <AlertTriangle className="text-yellow-400 flex-shrink-0 mt-0.5" size={20} />
-              <div>
-                <p className="text-yellow-400 font-medium">Low Stock Alert</p>
-                <p className="text-gray-300 text-sm mt-1">
-                  Only {stockQuantity} {stockQuantity === 1 ? 'item' : 'items'} left in stock. 
-                  Please contact the admin if you need more.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {selectedVariant && stockQuantity === 0 && (
-            <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-4 text-center">
-              <p className="text-red-400 font-medium">Out of Stock</p>
-              <p className="text-gray-400 text-sm mt-1">This color is currently unavailable. Please contact the admin.</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {variants.length === 0 ? (
-              <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 text-center">
-                <p className="text-red-400 font-medium">No variants available for this product.</p>
-                <p className="text-gray-400 text-sm mt-1">Please contact the admin to add product variants.</p>
-              </div>
-            ) : (
+            {allImages.length > 1 && (
               <>
-                <div>
-                  <label className="block text-white font-medium mb-2">Color</label>
-                  {availableColors.length === 0 ? (
-                    <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3">
-                      <p className="text-yellow-400 text-sm">No colors available for this product.</p>
-                    </div>
-                  ) : availableColors.length === 1 ? (
-                    <div className="bg-gray-800 rounded-lg p-3 border border-green-500/30">
-                      <p className="text-white">Color: <span className="text-green-400 font-medium">{availableColors[0]}</span></p>
-                    </div>
-                  ) : (
-                    <select
-                      value={selectedColor}
-                      onChange={(e) => {
-                        setSelectedColor(e.target.value);
-                        setSelectedSize(""); // Reset size when color changes
-                        setQuantity(1); // Reset quantity
-                      }}
-                      className="input-field w-full"
-                      required
-                    >
-                      <option value="">Select color</option>
-                      {availableColors.map((color) => (
-                        <option key={color} value={color}>
-                          {color}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                <button
+                  onClick={prevImage}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all"
+                >
+                  <ChevronLeft size={32} />
+                </button>
+                <button
+                  onClick={nextImage}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all"
+                >
+                  <ChevronRight size={32} />
+                </button>
 
-                <div>
-                  <label className="block text-white font-medium mb-2">Size</label>
-                  {!selectedColor ? (
-                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
-                      <p className="text-gray-400 text-sm">Please select a color first</p>
-                    </div>
-                  ) : availableSizes.length === 0 ? (
-                    <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3">
-                      <p className="text-yellow-400 text-sm">No sizes available for this color.</p>
-                    </div>
-                  ) : (
-                    <select
-                      value={selectedSize}
-                      onChange={(e) => setSelectedSize(e.target.value)}
-                      className="input-field w-full"
-                      required
-                    >
-                      <option value="">Select size</option>
-                      {availableSizes.map((size: string) => (
-                        <option key={size} value={size}>
-                          {size}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
+                  {allImages.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentImageIndex(idx)}
+                      className={`w-3 h-3 rounded-full transition-all ${
+                        idx === currentImageIndex
+                          ? "bg-green-500 w-6"
+                          : "bg-white/50 hover:bg-white/70"
+                      }`}
+                    />
+                  ))}
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
 
-            <div>
-              <label className="block text-white font-medium mb-2">
-                Quantity {selectedVariant && stockQuantity > 0 && (
-                  <span className="text-gray-400 text-sm ml-2">
-                    ({stockQuantity} available)
-                  </span>
+      {/* Main Modal */}
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+        <div className="bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-green-500/20">
+          <div className="sticky top-0 bg-gradient-to-r from-green-600 to-green-500 p-6 flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-white">Place Order</h2>
+            <button
+              onClick={onClose}
+              className="text-white hover:text-gray-200 transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="p-6">
+            <div className="mb-6">
+              <div className="relative group">
+                <img
+                  src={allImages[currentImageIndex] || product.image_url}
+                  alt={product.name}
+                  className="w-full h-64 object-cover rounded-lg transition-all duration-300"
+                />
+                
+                {/* Full Screen Button */}
+                <button
+                  type="button"
+                  onClick={toggleFullScreen}
+                  className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white p-2 rounded-full transition-all shadow-lg"
+                >
+                  <Maximize2 size={20} />
+                </button>
+                
+                {allImages.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={prevImage}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all"
+                    >
+                      <ChevronLeft size={24} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={nextImage}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all"
+                    >
+                      <ChevronRight size={24} />
+                    </button>
+                    
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
+                      {allImages.map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setCurrentImageIndex(idx)}
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            idx === currentImageIndex
+                              ? "bg-green-500 w-4"
+                              : "bg-white/50 hover:bg-white/70"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
                 )}
-              </label>
-              <input
-                type="number"
-                min="1"
-                max={maxQuantity}
-                value={quantity}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  if (val <= maxQuantity) {
-                    setQuantity(val);
-                  }
-                }}
-                className="input-field w-full"
-                disabled={!selectedVariant || stockQuantity === 0}
-                required
-              />
-              {selectedVariant && stockQuantity > 0 && quantity > stockQuantity && (
-                <p className="text-yellow-400 text-sm mt-1">
-                  Maximum available quantity is {stockQuantity}
-                </p>
-              )}
+              </div>
+              <div className="flex items-start justify-between mt-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-white">{product.name}</h3>
+                  <p className="text-gray-400 mt-2">{product.description}</p>
+                </div>
+                {sellingPrice !== null && (
+                  <div className="bg-gradient-to-r from-green-600 to-green-500 rounded-lg px-4 py-2 ml-4">
+                    <p className="text-white font-bold text-xl">${sellingPrice.toFixed(2)}</p>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div>
-              <label className="block text-white font-medium mb-2">County</label>
-              <select
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="input-field w-full"
-                required
-              >
-                {KENYAN_COUNTIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-white font-medium mb-2">Phone Number</label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => {
-                  setPhoneNumber(e.target.value);
-                  if (e.target.value) {
-                    setPhoneError(validatePhoneNumber(e.target.value) ? "" : "Invalid Kenyan phone number");
-                  } else {
-                    setPhoneError("");
-                  }
-                }}
-                onBlur={() => {
-                  if (phoneNumber && !validatePhoneNumber(phoneNumber)) {
-                    setPhoneError("Please enter a valid Kenyan phone (e.g., 0712345678, 254712345678, or +254712345678)");
-                  }
-                }}
-                placeholder="0712345678 or +254712345678"
-                className="input-field w-full"
-                required
-              />
-              {phoneError && (
-                <p className="text-red-400 text-sm mt-2">{phoneError}</p>
-              )}
-            </div>
-
-            {sellingPrice !== null && quantity > 0 && (
-              <div className="bg-gradient-to-r from-green-900/30 to-gray-800 rounded-lg p-4 border border-green-500/20">
-                <div className="flex items-center justify-between text-lg">
-                  <span className="text-gray-300 font-medium">Total:</span>
-                  <span className="text-green-400 font-bold">${(sellingPrice * quantity).toFixed(2)}</span>
+            {selectedVariant && stockQuantity < 5 && stockQuantity > 0 && (
+              <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4 mb-4 flex items-start gap-3">
+                <AlertTriangle className="text-yellow-400 flex-shrink-0 mt-0.5" size={20} />
+                <div>
+                  <p className="text-yellow-400 font-medium">Low Stock Alert</p>
+                  <p className="text-gray-300 text-sm mt-1">
+                    Only {stockQuantity} {stockQuantity === 1 ? 'item' : 'items'} left in stock. 
+                    Please contact the admin if you need more.
+                  </p>
                 </div>
               </div>
             )}
 
-            <div className="bg-gradient-to-r from-green-900/30 to-gray-800 rounded-lg p-4 border border-green-500/20">
-              <p className="text-gray-300 text-sm">
-                After placing your order, you will receive a call from us between 7:00 PM to 10:00 PM. 
-                Please keep your phone available during this time.
-              </p>
-            </div>
+            {selectedVariant && stockQuantity === 0 && (
+              <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-4 text-center">
+                <p className="text-red-400 font-medium">Out of Stock</p>
+                <p className="text-gray-400 text-sm mt-1">This color is currently unavailable. Please contact the admin.</p>
+              </div>
+            )}
 
-            <button
-              type="submit"
-              disabled={loading || variants.length === 0 || availableColors.length === 0 || !selectedColor || availableSizes.length === 0 || !selectedVariant || stockQuantity === 0 || !!phoneError}
-              className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-lg shadow-green-500/30 w-full mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? "Placing Order..." : 
-               variants.length === 0 ? "No Variants Available" : 
-               stockQuantity === 0 ? "Out of Stock" :
-               "Place Order"}
-            </button>
-          </form>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {variants.length === 0 ? (
+                <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 text-center">
+                  <p className="text-red-400 font-medium">No variants available for this product.</p>
+                  <p className="text-gray-400 text-sm mt-1">Please contact the admin to add product variants.</p>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-white font-medium mb-2">Color</label>
+                    {availableColors.length === 0 ? (
+                      <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3">
+                        <p className="text-yellow-400 text-sm">No colors available for this product.</p>
+                      </div>
+                    ) : availableColors.length === 1 ? (
+                      <div className="bg-gray-800 rounded-lg p-3 border border-green-500/30">
+                        <p className="text-white">Color: <span className="text-green-400 font-medium">{availableColors[0]}</span></p>
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedColor}
+                        onChange={(e) => {
+                          const newColor = e.target.value;
+                          setSelectedColor(newColor);
+                          setSelectedSize(""); // Reset size when color changes
+                          setQuantity(1); // Reset quantity
+                          
+                          // Update image to match the selected color
+                          const matchingVariant = variants.find((v) => v.color === newColor);
+                          if (matchingVariant?.image_url) {
+                            const imageIndex = allImages.indexOf(matchingVariant.image_url);
+                            if (imageIndex !== -1) {
+                              setCurrentImageIndex(imageIndex);
+                            }
+                          }
+                        }}
+                        className="input-field w-full"
+                        required
+                      >
+                        <option value="">Select color</option>
+                        {availableColors.map((color) => (
+                          <option key={color} value={color}>
+                            {color}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-white font-medium mb-2">Size</label>
+                    {!selectedColor ? (
+                      <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
+                        <p className="text-gray-400 text-sm">Please select a color first</p>
+                      </div>
+                    ) : availableSizes.length === 0 ? (
+                      <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3">
+                        <p className="text-yellow-400 text-sm">No sizes available for this color.</p>
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedSize}
+                        onChange={(e) => setSelectedSize(e.target.value)}
+                        className="input-field w-full"
+                        required
+                      >
+                        <option value="">Select size</option>
+                        {availableSizes.map((size: string) => (
+                          <option key={size} value={size}>
+                            {size}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="block text-white font-medium mb-2">
+                  Quantity {selectedVariant && stockQuantity > 0 && (
+                    <span className="text-gray-400 text-sm ml-2">
+                      ({stockQuantity} available)
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  min="1"
+                  max={maxQuantity}
+                  value={quantity}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow empty field for editing
+                    if (value === '') {
+                      setQuantity('' as any);
+                      return;
+                    }
+                    const val = parseInt(value);
+                    if (!isNaN(val) && val >= 1 && val <= maxQuantity) {
+                      setQuantity(val);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Set to 1 if empty when user leaves the field
+                    if (e.target.value === '' || parseInt(e.target.value) < 1) {
+                      setQuantity(1);
+                    }
+                  }}
+                  className="input-field w-full text-lg"
+                  disabled={!selectedVariant || stockQuantity === 0}
+                  required
+                />
+                {selectedVariant && stockQuantity > 0 && quantity > stockQuantity && (
+                  <p className="text-yellow-400 text-sm mt-1">
+                    Maximum available quantity is {stockQuantity}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                
+                <label className="block text-white font-medium mb-2">County</label>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="input-field w-full"
+                  required
+                >
+                  {KENYAN_COUNTIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-white font-medium mb-2">Phone Number</label>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    setPhoneNumber(e.target.value);
+                    if (e.target.value) {
+                      setPhoneError(validatePhoneNumber(e.target.value) ? "" : "Invalid Kenyan phone number");
+                    } else {
+                      setPhoneError("");
+                    }
+                  }}
+                  onBlur={() => {
+                    if (phoneNumber && !validatePhoneNumber(phoneNumber)) {
+                      setPhoneError("Please enter a valid Kenyan phone (e.g., 0712345678, 254712345678, or +254712345678)");
+                    }
+                  }}
+                  placeholder="0712345678 or +254712345678"
+                  className="input-field w-full"
+                  required
+                />
+                {phoneError && (
+                  <p className="text-red-400 text-sm mt-2">{phoneError}</p>
+                )}
+              </div>
+
+              {sellingPrice !== null && quantity > 0 && (
+                <div className="bg-gradient-to-r from-green-900/30 to-gray-800 rounded-lg p-4 border border-green-500/20">
+                  <div className="flex items-center justify-between text-lg">
+                    <span className="text-gray-300 font-medium">Total:</span>
+                    <span className="text-green-400 font-bold">${(sellingPrice * quantity).toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-gradient-to-r from-green-900/30 to-gray-800 rounded-lg p-4 border border-green-500/20">
+                <p className="text-gray-300 text-sm">
+                  After placing your order, you will receive a call from us between 7:00 PM to 10:00 PM. 
+                  Please keep your phone available during this time.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || variants.length === 0 || availableColors.length === 0 || !selectedColor || availableSizes.length === 0 || !selectedVariant || stockQuantity === 0 || !!phoneError}
+                className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-lg shadow-green-500/30 w-full mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? "Placing Order..." : 
+                 variants.length === 0 ? "No Variants Available" : 
+                 stockQuantity === 0 ? "Out of Stock" :
+                 "Place Order"}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

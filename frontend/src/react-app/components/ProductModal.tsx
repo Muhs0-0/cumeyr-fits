@@ -23,6 +23,9 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
   const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(false);
   
+  // Available sizes for the product (can be edited)
+  const [productSizes, setProductSizes] = useState<string[]>([]);
+  
   // First variant fields (with color-specific sizes)
   const [variantColor, setVariantColor] = useState("");
   const [variantSizes, setVariantSizes] = useState<string[]>([]);
@@ -39,14 +42,13 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
       setImagePreview(product.image_url || "");
       setIsActive(product.is_active);
       
-      // When editing, load the product's size range (should be all category sizes)
-      // But don't allow modifying it since variants depend on it
+      // Load the product's available sizes
       if (product.available_sizes) {
         try {
           const sizes = JSON.parse(product.available_sizes);
-          setVariantSizes(sizes);
+          setProductSizes(sizes);
         } catch {
-          setVariantSizes([]);
+          setProductSizes([]);
         }
       }
     }
@@ -75,12 +77,38 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
     }
   };
 
+  const toggleProductSize = (size: string) => {
+    setProductSizes(prev => 
+      prev.includes(size) 
+        ? prev.filter(s => s !== size)
+        : [...prev, size]
+    );
+  };
+
+  const selectAllProductSizes = () => {
+    const allSizes = getSizeOptions();
+    setProductSizes(allSizes);
+  };
+
+  const deselectAllProductSizes = () => {
+    setProductSizes([]);
+  };
+
   const toggleVariantSize = (size: string) => {
     setVariantSizes(prev => 
       prev.includes(size) 
         ? prev.filter(s => s !== size)
         : [...prev, size]
     );
+  };
+
+  const selectAllVariantSizes = () => {
+    const allSizes = getSizeOptions();
+    setVariantSizes(allSizes);
+  };
+
+  const deselectAllVariantSizes = () => {
+    setVariantSizes([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,6 +137,12 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
         alert("Please upload an image for the first variant");
         return;
       }
+    } else {
+      // When editing, validate product sizes
+      if (productSizes.length === 0) {
+        alert("Please select at least one size for the product");
+        return;
+      }
     }
 
     setLoading(true);
@@ -127,18 +161,14 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
         finalImageUrl = uploadData.url;
       }
 
-      // Get ALL possible sizes for this category (not just selected ones)
-      const allCategorySizes = getSizeOptions();
-      
       const data = {
         name,
         description,
         category,
         image_url: finalImageUrl,
         is_active: isActive,
-        // IMPORTANT: Save ALL possible sizes for this category to product (not just first variant's sizes)
-        // This allows future variants to choose from the full size range
-        available_sizes: JSON.stringify(allCategorySizes),
+        // Save selected sizes for the product
+        available_sizes: JSON.stringify(product ? productSizes : getSizeOptions()),
         // First variant data (only for new products)
         ...(!product && {
           first_variant: {
@@ -220,57 +250,129 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
               value={category}
               onChange={(e) => {
                 setCategory(e.target.value);
-                setVariantSizes([]); // Reset selected sizes when category changes
+                setProductSizes([]); // Reset selected sizes when category changes
+                setVariantSizes([]); // Reset variant sizes too
               }}
               className="input-field w-full"
               required
+              disabled={!!product} // Don't allow category change when editing
             >
               <option value="Footwear">Footwear</option>
               <option value="Apparel">Apparel</option>
               <option value="Accessories">Accessories</option>
             </select>
+            {product && (
+              <p className="text-gray-400 text-sm mt-1">Category cannot be changed after product creation</p>
+            )}
           </div>
 
-          <div>
-            <label className="block text-white font-medium mb-2">
-              {product ? "Product Size Range" : "Select Sizes for First Variant"} <span className="text-red-400">*</span>
-            </label>
-            <p className="text-gray-400 text-sm mb-3">
-              {product 
-                ? "These are all possible sizes for this product category. Individual variants choose which sizes they stock."
-                : "Choose which sizes this color variant will be available in"
-              }
-            </p>
-            <div className="bg-gradient-to-r from-green-900/20 to-gray-800 rounded-lg p-4 border border-green-500/20">
-              <div className="flex flex-wrap gap-2">
-                {getSizeOptions().map((size) => (
+          {product && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-white font-medium">
+                  Available Product Sizes <span className="text-red-400">*</span>
+                </label>
+                <div className="flex gap-2">
                   <button
-                    key={size}
                     type="button"
-                    onClick={() => !product && toggleVariantSize(size)}
-                    disabled={!!product}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                      variantSizes.includes(size)
-                        ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    } ${product ? 'cursor-not-allowed opacity-75' : ''}`}
+                    onClick={selectAllProductSizes}
+                    className="text-sm text-green-400 hover:text-green-300 transition-colors"
                   >
-                    {variantSizes.includes(size) && <Check size={16} />}
-                    {size}
+                    Select All
                   </button>
-                ))}
+                  <span className="text-gray-500">|</span>
+                  <button
+                    type="button"
+                    onClick={deselectAllProductSizes}
+                    className="text-sm text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Deselect All
+                  </button>
+                </div>
               </div>
-              {!product && variantSizes.length === 0 && (
-                <p className="text-yellow-400 text-sm mt-3">⚠ Please select at least one size</p>
-              )}
-              {product && (
-                <p className="text-blue-400 text-sm mt-3">ℹ️ Size range is fixed after product creation. Add variants with specific sizes in "Manage Variants".</p>
-              )}
+              <p className="text-gray-400 text-sm mb-3">
+                Select all sizes you want available for this product. Variants can choose from these sizes.
+              </p>
+              <div className="bg-gradient-to-r from-green-900/20 to-gray-800 rounded-lg p-4 border border-green-500/20">
+                <div className="flex flex-wrap gap-2">
+                  {getSizeOptions().map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => toggleProductSize(size)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                        productSizes.includes(size)
+                          ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      {productSizes.includes(size) && <Check size={16} />}
+                      {size}
+                    </button>
+                  ))}
+                </div>
+                {productSizes.length === 0 && (
+                  <p className="text-yellow-400 text-sm mt-3">⚠ Please select at least one size</p>
+                )}
+                <p className="text-blue-400 text-sm mt-3">
+                  ℹ️ Adding new sizes will make them available for all variants to use. Existing variants won't be affected.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           {!product && (
             <>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-white font-medium">
+                    Select Sizes for First Variant <span className="text-red-400">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={selectAllVariantSizes}
+                      className="text-sm text-green-400 hover:text-green-300 transition-colors"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-gray-500">|</span>
+                    <button
+                      type="button"
+                      onClick={deselectAllVariantSizes}
+                      className="text-sm text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+                <p className="text-gray-400 text-sm mb-3">
+                  Choose which sizes this color variant will be available in
+                </p>
+                <div className="bg-gradient-to-r from-green-900/20 to-gray-800 rounded-lg p-4 border border-green-500/20">
+                  <div className="flex flex-wrap gap-2">
+                    {getSizeOptions().map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => toggleVariantSize(size)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                          variantSizes.includes(size)
+                            ? 'bg-green-600 text-white shadow-lg shadow-green-500/30'
+                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                      >
+                        {variantSizes.includes(size) && <Check size={16} />}
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                  {variantSizes.length === 0 && (
+                    <p className="text-yellow-400 text-sm mt-3">⚠ Please select at least one size</p>
+                  )}
+                </div>
+              </div>
+
               <div className="bg-gradient-to-r from-green-900/30 to-gray-800 rounded-lg p-4 border border-green-500/30">
                 <h3 className="text-white font-semibold mb-3">First Variant Details</h3>
                 <p className="text-gray-400 text-sm mb-4">
@@ -421,7 +523,7 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
           <div className="flex gap-3 pt-4">
             <button
               type="submit"
-              disabled={loading || (!product && variantSizes.length === 0)}
+              disabled={loading || (!product && variantSizes.length === 0) || (product && productSizes.length === 0)}
               className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-lg shadow-green-500/30 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Saving..." : product ? "Update Product" : "Add Product"}
