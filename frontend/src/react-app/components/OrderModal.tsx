@@ -88,11 +88,13 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
   const [phoneError, setPhoneError] = useState("");
   const [country, setCountry] = useState(""); // FIXED: Changed from "Nairobi" to empty string
   const [loading, setLoading] = useState(false);
+  const [variantsLoading, setVariantsLoading] = useState(true); // NEW: Loading state for variants
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [allImages, setAllImages] = useState<string[]>([]);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
+    setVariantsLoading(true); // Start loading
     fetch(`${API_BASE}/api/products/${product.id}/variants`)
       .then((res) => res.json())
       .then((data: ProductVariant[]) => {
@@ -112,6 +114,12 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
         if (colors.length > 0 && colors[0]) {
           setSelectedColor(colors[0]);
         }
+      })
+      .catch((err) => {
+        console.error("Error loading variants:", err);
+      })
+      .finally(() => {
+        setVariantsLoading(false); // Stop loading
       });
   }, [product.id]);
 
@@ -269,12 +277,14 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
 
           <div className="p-6">
             <div className="mb-6">
-              <div className="relative group">
-                <img
-                  src={allImages[currentImageIndex] || product.image_url}
-                  alt={product.name}
-                  className="w-full h-64 object-cover rounded-lg transition-all duration-300"
-                />
+              <div className="relative group overflow-hidden rounded-lg">
+                <div className="w-full h-64 bg-gray-800">
+                  <img
+                    src={allImages[currentImageIndex] || product.image_url}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
                 
                 {/* Full Screen Button */}
                 <button
@@ -353,7 +363,12 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {variants.length === 0 ? (
+              {variantsLoading ? (
+                <div className="bg-gray-800 rounded-lg p-8 text-center">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mb-4"></div>
+                  <p className="text-gray-400">Loading product variants...</p>
+                </div>
+              ) : variants.length === 0 ? (
                 <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 text-center">
                   <p className="text-red-400 font-medium">No variants available for this product.</p>
                   <p className="text-gray-400 text-sm mt-1">Please contact the admin to add product variants.</p>
@@ -545,10 +560,11 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
 
               <button
                 type="submit"
-                disabled={loading || variants.length === 0 || availableColors.length === 0 || !selectedColor || availableSizes.length === 0 || !selectedVariant || stockQuantity === 0 || !!phoneError}
+                disabled={variantsLoading || loading || variants.length === 0 || availableColors.length === 0 || !selectedColor || availableSizes.length === 0 || !selectedVariant || stockQuantity === 0 || !!phoneError}
                 className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-lg shadow-green-500/30 w-full mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Placing Order..." : 
+                {variantsLoading ? "Loading..." :
+                 loading ? "Placing Order..." : 
                  variants.length === 0 ? "No Variants Available" : 
                  stockQuantity === 0 ? "Out of Stock" :
                  "Place Order"}
