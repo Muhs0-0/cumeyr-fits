@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import Navbar from "@/react-app/components/Navbar";
 import ProductCard from "@/react-app/components/ProductCard";
 import OrderModal from "@/react-app/components/OrderModal";
@@ -10,18 +11,26 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchProducts();
   }, [selectedCategory]);
 
   const fetchProducts = async () => {
-    const url = selectedCategory === "all"
-      ? `${API_BASE}/api/products`
-      : `${API_BASE}/api/products?category=${selectedCategory}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    setProducts(data);
+    setLoading(true);
+    try {
+      const url = selectedCategory === "all"
+        ? `${API_BASE}/api/products`
+        : `${API_BASE}/api/products?category=${selectedCategory}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      setProducts(data);
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOrderSubmit = async (orderData: {
@@ -84,7 +93,12 @@ export default function HomePage() {
           <p className="text-gray-400">Browse our premium collection and place your order</p>
         </div>
 
-        {products.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="w-12 h-12 text-green-500 animate-spin mb-4" />
+            <p className="text-gray-400 text-lg">Loading products...</p>
+          </div>
+        ) : products.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-gray-400 text-lg">No products available in this category</p>
           </div>
