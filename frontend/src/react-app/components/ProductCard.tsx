@@ -34,18 +34,23 @@ export default function ProductCard({ product, onClick }: ProductCardProps) {
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-green-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        
-        {/* Price Badge */}
-        {lowestPrice !== null && (
-          <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-            <p className="text-white font-bold text-sm">
-              KSh {lowestPrice.toFixed(2)}
-            </p>
-          </div>
-        )}
       </div>
       <div className="p-4">
-        <div className="text-xs text-green-400 mb-1 font-medium">{product.category}</div>
+        <div className="flex items-start justify-between mb-1">
+          <div className="text-xs text-green-400 font-medium">{product.category}</div>
+          
+          {/* Price Badge */}
+          {lowestPrice !== null && (
+            <div className="flex flex-col items-end">
+              <p className="text-gray-500 text-xs line-through">
+                KSh {(lowestPrice * 1.1).toFixed(2)}
+              </p>
+              <p className="text-green-400 font-bold text-lg">
+                KSh {lowestPrice.toFixed(2)}
+              </p>
+            </div>
+          )}
+        </div>
         <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-green-400 transition-colors">{product.name}</h3>
         <p className="text-sm text-gray-400 line-clamp-2">{product.description}</p>
       </div>
