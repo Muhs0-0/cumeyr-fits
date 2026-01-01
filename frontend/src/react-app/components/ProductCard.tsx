@@ -43,7 +43,7 @@ export default function ProductCard({ product, onClick }: ProductCardProps) {
           {lowestPrice !== null && (
             <div className="flex flex-col items-end">
               <p className="text-gray-500 text-xs line-through">
-                KSh {(lowestPrice * 1.1).toFixed(2)}
+                KSh {(lowestPrice * 1.2).toFixed(2)}
               </p>
               <p className="text-green-400 font-bold text-lg">
                 KSh {lowestPrice.toFixed(2)}
