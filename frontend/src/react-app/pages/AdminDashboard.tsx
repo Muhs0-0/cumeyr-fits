@@ -10,6 +10,7 @@ interface ExtendedOrder extends Order {
   selling_price?: number;
   profit?: number;
   variant_image?: string; // NEW: Add variant image URL
+  variant_id?: string | number; // ADD: variant_id for fetching variant data
 }
 
 export default function AdminDashboardPage() {

@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Grid3x3 } from "lucide-react";
+
 
 interface NavbarProps {
   selectedCategory: string;
