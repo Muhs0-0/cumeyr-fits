@@ -252,9 +252,10 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
               value={category}
               onChange={(e) => {
                 setCategory(e.target.value);
+                // Reset selected sizes when category changes for new products
                 if (!product) {
-                  setProductSizes([]); // Reset selected sizes when category changes (only for new products)
-                  setVariantSizes([]); // Reset variant sizes too
+                  setProductSizes([]);
+                  setVariantSizes([]);
                 }
               }}
               className="input-field w-full"
@@ -264,6 +265,11 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
               <option value="Opens">Opens</option>
               <option value="Sneakers">Sneakers</option>
             </select>
+            {product && (
+              <p className="text-yellow-400 text-sm mt-2">
+                ⚠️ Changing category will update the product category. Existing sizes will remain unchanged.
+              </p>
+            )}
           </div>
 
           {product && (
