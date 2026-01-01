@@ -252,20 +252,18 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
               value={category}
               onChange={(e) => {
                 setCategory(e.target.value);
-                setProductSizes([]); // Reset selected sizes when category changes
-                setVariantSizes([]); // Reset variant sizes too
+                if (!product) {
+                  setProductSizes([]); // Reset selected sizes when category changes (only for new products)
+                  setVariantSizes([]); // Reset variant sizes too
+                }
               }}
               className="input-field w-full"
               required
-              disabled={!!product} // Don't allow category change when editing
             >
               <option value="Slides">Slides</option>
               <option value="Opens">Opens</option>
               <option value="Sneakers">Sneakers</option>
             </select>
-            {product && (
-              <p className="text-gray-400 text-sm mt-1">Category cannot be changed after product creation</p>
-            )}
           </div>
 
           {product && (
@@ -293,7 +291,7 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
                 </div>
               </div>
               <p className="text-gray-400 text-sm mb-3">
-                Select all sizes you want available for this product. Variants can choose from these sizes.
+                Select all sizes you want available for this product. After updating, all variants will have access to these sizes.
               </p>
               <div className="bg-gradient-to-r from-green-900/20 to-gray-800 rounded-lg p-4 border border-green-500/20">
                 <div className="flex flex-wrap gap-2">
@@ -316,8 +314,15 @@ export default function ProductModal({ product, onClose, onSave }: ProductModalP
                 {productSizes.length === 0 && (
                   <p className="text-yellow-400 text-sm mt-3">⚠ Please select at least one size</p>
                 )}
-                <p className="text-blue-400 text-sm mt-3">
-                  ℹ️ Adding new sizes will make them available for all variants to use. Existing variants won't be affected.
+              </div>
+              
+              <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mt-4">
+                <p className="text-blue-400 text-sm font-medium mb-2">
+                  💡 To edit prices, stock, or variant-specific sizes:
+                </p>
+                <p className="text-gray-300 text-sm">
+                  Click "Manage Variants" button next to this product in the products list. 
+                  There you can edit each color variant's prices, stock quantities, images, and specific sizes.
                 </p>
               </div>
             </div>

@@ -86,15 +86,15 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
   const [quantity, setQuantity] = useState(1);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneError, setPhoneError] = useState("");
-  const [country, setCountry] = useState(""); // FIXED: Changed from "Nairobi" to empty string
+  const [country, setCountry] = useState("");
   const [loading, setLoading] = useState(false);
-  const [variantsLoading, setVariantsLoading] = useState(true); // NEW: Loading state for variants
+  const [variantsLoading, setVariantsLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [allImages, setAllImages] = useState<string[]>([]);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
-    setVariantsLoading(true); // Start loading
+    setVariantsLoading(true);
     fetch(`${API_BASE}/api/products/${product.id}/variants`)
       .then((res) => res.json())
       .then((data: ProductVariant[]) => {
@@ -119,7 +119,7 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
         console.error("Error loading variants:", err);
       })
       .finally(() => {
-        setVariantsLoading(false); // Stop loading
+        setVariantsLoading(false);
       });
   }, [product.id]);
 
@@ -264,8 +264,8 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
 
       {/* Main Modal */}
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-        <div className="bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-green-500/20">
-          <div className="sticky top-0 bg-gradient-to-r from-green-600 to-green-500 p-6 flex items-center justify-between">
+        <div className="bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl border border-green-500/20 flex flex-col">
+          <div className="bg-gradient-to-r from-green-600 to-green-500 p-6 flex items-center justify-between flex-shrink-0">
             <h2 className="text-2xl font-bold text-white">Place Order</h2>
             <button
               onClick={onClose}
@@ -275,7 +275,7 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
             </button>
           </div>
 
-          <div className="p-6">
+          <div className="p-6 overflow-y-auto flex-1">
             <div className="mb-6">
               <div className="relative group overflow-hidden rounded-lg">
                 <div className="w-full h-64 bg-gray-800">
@@ -336,7 +336,7 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
                 </div>
                 {sellingPrice !== null && (
                   <div className="bg-gradient-to-r from-green-600 to-green-500 rounded-lg px-4 py-2 ml-4">
-                    <p className="text-white font-bold text-xl">${sellingPrice.toFixed(2)}</p>
+                    <p className="text-white font-bold text-xl">KSh {sellingPrice.toFixed(2)}</p>
                   </div>
                 )}
               </div>
@@ -490,7 +490,6 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
               </div>
 
               <div>
-                
                 <label className="block text-white font-medium mb-2">County</label>
                 <select
                   value={country}
@@ -546,7 +545,7 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
                 <div className="bg-gradient-to-r from-green-900/30 to-gray-800 rounded-lg p-4 border border-green-500/20">
                   <div className="flex items-center justify-between text-lg">
                     <span className="text-gray-300 font-medium">Total:</span>
-                    <span className="text-green-400 font-bold">${(sellingPrice * quantity).toFixed(2)}</span>
+                    <span className="text-green-400 font-bold">KSh {(sellingPrice * quantity).toFixed(2)}</span>
                   </div>
                 </div>
               )}

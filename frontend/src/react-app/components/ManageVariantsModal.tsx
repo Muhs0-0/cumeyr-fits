@@ -198,13 +198,13 @@ export default function ManageVariantsModal({ product, onClose }: ManageVariants
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-400">Cost Price:</span>
                           <span className="text-white font-medium">
-                            ${variant.cost_price?.toFixed(2) || '0.00'}
+                            KSh {variant.cost_price?.toFixed(2) || '0.00'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-400">Selling Price:</span>
                           <span className="text-green-400 font-medium">
-                            ${variant.selling_price?.toFixed(2) || '0.00'}
+                            KSh {variant.selling_price?.toFixed(2) || '0.00'}
                           </span>
                         </div>
                         {profit !== null && (
@@ -214,7 +214,7 @@ export default function ManageVariantsModal({ product, onClose }: ManageVariants
                               Profit/Unit:
                             </span>
                             <span className={`font-semibold ${profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              ${profit.toFixed(2)}
+                              KSh {profit.toFixed(2)}
                             </span>
                           </div>
                         )}

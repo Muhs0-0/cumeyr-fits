@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Package, ShoppingBag, Plus, Pencil, Trash2, CheckCircle, XCircle, Clock, Layers, DollarSign, TrendingUp, AlertTriangle, Box, User } from "lucide-react";
+import { Package, ShoppingBag, Plus, Pencil, Trash2, CheckCircle, XCircle, Clock, Layers, DollarSign, TrendingUp, AlertTriangle, Box, User, Filter } from "lucide-react";
 import ProductModal from "@/react-app/components/ProductModal";
 import ManageVariantsModal from "@/react-app/components/ManageVariantsModal";
 import type { Product, Order, Analytics } from "@/shared/types";
@@ -9,6 +9,7 @@ interface ExtendedOrder extends Order {
   cost_price?: number;
   selling_price?: number;
   profit?: number;
+  variant_image?: string; // NEW: Add variant image URL
 }
 
 export default function AdminDashboardPage() {
@@ -18,18 +19,26 @@ export default function AdminDashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<"all" | "approved" | "pending" | "cancelled">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
   const [showVariantsModal, setShowVariantsModal] = useState(false);
   const [variantsProduct, setVariantsProduct] = useState<Product | undefined>();
   const [adminName, setAdminName] = useState("");
   const [adminId, setAdminId] = useState("");
-  // const [isInitialized, setIsInitialized] = useState(false);
   const navigate = useNavigate();
+
+  // Get unique categories from products
+  const categories = ["all", ...new Set(products.map(p => p.category).filter(Boolean))];
+
+  // Filter products by category
+  const filteredProducts = products.filter(product => {
+    if (categoryFilter === "all") return true;
+    return product.category === categoryFilter;
+  });
 
   useEffect(() => {
     console.log("🔷 AdminDashboard useEffect running - checking auth");
-    // Check localStorage first (persists across refresh)
     const authToken = localStorage.getItem("adminAuth");
     const name = localStorage.getItem("adminName") || "Admin";
     const id = localStorage.getItem("adminId") || "";
@@ -45,7 +54,6 @@ export default function AdminDashboardPage() {
     console.log("✅ Auth token found - setting admin info");
     setAdminName(name);
     setAdminId(id);
-    // setIsInitialized(true);
     
     console.log("🔷 Fetching orders, products, and analytics");
     fetchOrders();
@@ -60,7 +68,24 @@ export default function AdminDashboardPage() {
       console.log("🔷 Orders response status:", res.status);
       const data = await res.json();
       console.log("✅ Orders fetched:", data);
-      setOrders(data);
+      
+      // Fetch variant images for each order
+      const ordersWithImages = await Promise.all(
+        data.map(async (order: ExtendedOrder) => {
+          try {
+            const variantRes = await fetch(`${API_BASE}/api/admin/variants/${order.variant_id}`);
+            if (variantRes.ok) {
+              const variantData = await variantRes.json();
+              return { ...order, variant_image: variantData.image_url };
+            }
+          } catch (err) {
+            console.error("Error fetching variant image:", err);
+          }
+          return order;
+        })
+      );
+      
+      setOrders(ordersWithImages);
     } catch (err) {
       console.error("❌ Error fetching orders:", err);
     }
@@ -102,7 +127,6 @@ export default function AdminDashboardPage() {
     fetchAnalytics();
   };
 
-
   const handleDeleteProduct = async (productId: number) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
     await fetch(`${API_BASE}/api/admin/products/${productId}`, { method: "DELETE" });
@@ -142,7 +166,6 @@ export default function AdminDashboardPage() {
   };
 
   const handleLogout = () => {
-    // Clear both sessionStorage and localStorage to ensure complete logout
     sessionStorage.removeItem("adminAuth");
     sessionStorage.removeItem("adminId");
     sessionStorage.removeItem("adminName");
@@ -323,56 +346,71 @@ export default function AdminDashboardPage() {
                   <div key={order.id} className="card">
                     <div className="p-6">
                       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="text-lg font-semibold text-white">
-                              {order.product_name}
-                            </h3>
-                            <span
-                              className={`px-2 py-1 text-xs rounded-full ${
-                                order.status === "completed"
-                                  ? "bg-green-600 text-white"
-                                  : order.status === "cancelled"
-                                  ? "bg-red-600 text-white"
-                                  : order.status === "confirmed"
-                                  ? "bg-blue-600 text-white"
-                                  : "bg-yellow-600 text-black"
-                              }`}
-                            >
-                              {order.status}
-                            </span>
-                          </div>
-                          <div className="text-sm text-gray-400 space-y-1">
-                            <p>Size: {order.size} | Color: {order.color} | Quantity: {order.quantity}</p>
-                            <p>Phone: {order.phone_number}</p>
-                            {order.country && <p>Country: {order.country}</p>}
-                            <p>Order Date: {new Date(order.created_at).toLocaleString()}</p>
-                            {order.approved_by && order.approved_by.admin_name && (
-                              <p className="text-green-400 mt-2">✓ Approved by: <span className="font-semibold">{order.approved_by.admin_name}</span> on {new Date(order.approved_by.timestamp).toLocaleString()}</p>
-                            )}
-                            {order.deleted_by && order.deleted_by.admin_name && (
-                              <p className="text-red-400 mt-2">🗑️ Deleted by: <span className="font-semibold">{order.deleted_by.admin_name}</span> on {new Date(order.deleted_by.timestamp).toLocaleString()}</p>
-                            )}
-                          </div>
-
-                          {order.status === "completed" && order.selling_price && order.cost_price && (
-                            <div className="mt-4 bg-gradient-to-r from-green-900/20 to-gray-800/50 rounded-lg p-4 border border-green-500/20">
-                              <div className="grid grid-cols-3 gap-4 text-sm">
-                                <div>
-                                  <p className="text-gray-400">Revenue</p>
-                                  <p className="text-white font-semibold">${(order.selling_price * order.quantity).toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-gray-400">Cost</p>
-                                  <p className="text-white font-semibold">${(order.cost_price * order.quantity).toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-gray-400">Profit</p>
-                                  <p className="text-green-400 font-bold">${order.profit?.toFixed(2) || '0.00'}</p>
-                                </div>
-                              </div>
+                        {/* Order Image and Details */}
+                        <div className="flex gap-4 flex-1">
+                          {/* Variant Image */}
+                          {order.variant_image && (
+                            <div className="flex-shrink-0">
+                              <img
+                                src={order.variant_image}
+                                alt={`${order.product_name} - ${order.color}`}
+                                className="w-24 h-24 object-cover rounded-lg border border-gray-700"
+                              />
                             </div>
                           )}
+                          
+                          {/* Order Details */}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="text-lg font-semibold text-white">
+                                {order.product_name}
+                              </h3>
+                              <span
+                                className={`px-2 py-1 text-xs rounded-full ${
+                                  order.status === "completed"
+                                    ? "bg-green-600 text-white"
+                                    : order.status === "cancelled"
+                                    ? "bg-red-600 text-white"
+                                    : order.status === "confirmed"
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-yellow-600 text-black"
+                                }`}
+                              >
+                                {order.status}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-400 space-y-1">
+                              <p>Size: {order.size} | Color: {order.color} | Quantity: {order.quantity}</p>
+                              <p>Phone: {order.phone_number}</p>
+                              {order.country && <p>County: {order.country}</p>}
+                              <p>Order Date: {new Date(order.created_at).toLocaleString()}</p>
+                              {order.approved_by && order.approved_by.admin_name && (
+                                <p className="text-green-400 mt-2">✓ Approved by: <span className="font-semibold">{order.approved_by.admin_name}</span> on {new Date(order.approved_by.timestamp).toLocaleString()}</p>
+                              )}
+                              {order.deleted_by && order.deleted_by.admin_name && (
+                                <p className="text-red-400 mt-2">🗑️ Deleted by: <span className="font-semibold">{order.deleted_by.admin_name}</span> on {new Date(order.deleted_by.timestamp).toLocaleString()}</p>
+                              )}
+                            </div>
+
+                            {order.status === "completed" && order.selling_price && order.cost_price && (
+                              <div className="mt-4 bg-gradient-to-r from-green-900/20 to-gray-800/50 rounded-lg p-4 border border-green-500/20">
+                                <div className="grid grid-cols-3 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-gray-400">Revenue</p>
+                                    <p className="text-white font-semibold">${(order.selling_price * order.quantity).toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-400">Cost</p>
+                                    <p className="text-white font-semibold">${(order.cost_price * order.quantity).toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-400">Profit</p>
+                                    <p className="text-green-400 font-bold">${order.profit?.toFixed(2) || '0.00'}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         {order.status === "pending" && (
                           <div className="flex gap-2">
@@ -422,7 +460,33 @@ export default function AdminDashboardPage() {
         {activeTab === "products" && (
           <div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-              <h2 className="text-2xl font-bold text-white">Products Management</h2>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1">
+                <h2 className="text-2xl font-bold text-white">Products Management</h2>
+                
+                {/* Category Filter */}
+                {categories.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Filter size={18} className="text-gray-400" />
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-green-500 transition-colors"
+                    >
+                      {categories.map((category) => (
+                        <option key={category} value={category}>
+                          {category === "all" ? "All Categories" : category}
+                        </option>
+                      ))}
+                    </select>
+                    {categoryFilter !== "all" && (
+                      <span className="text-gray-400 text-sm">
+                        ({filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'})
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+              
               <button
                 onClick={handleAddProduct}
                 className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-medium py-3 px-6 rounded-lg transition-all shadow-lg shadow-green-500/30 flex items-center gap-2"
@@ -431,15 +495,25 @@ export default function AdminDashboardPage() {
                 Add Product
               </button>
             </div>
-            {products.length === 0 ? (
+            
+            {filteredProducts.length === 0 ? (
               <div className="col-span-full bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg p-12 text-center border border-gray-800">
                 <Package size={48} className="mx-auto mb-4 text-gray-600" />
-                <p className="text-gray-400 text-lg mb-2">No products yet</p>
-                <p className="text-gray-500 text-sm">Click "Add Product" to get started</p>
+                {categoryFilter === "all" ? (
+                  <>
+                    <p className="text-gray-400 text-lg mb-2">No products yet</p>
+                    <p className="text-gray-500 text-sm">Click "Add Product" to get started</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-gray-400 text-lg mb-2">No products in "{categoryFilter}"</p>
+                    <p className="text-gray-500 text-sm">Try selecting a different category</p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="col-span-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {products.map((product) => (
+                {filteredProducts.map((product) => (
                   <div key={product.id} className="card">
                     <img
                       src={product.image_url}

@@ -371,6 +371,19 @@ app.get('/api/admin/products', async (req, res) => {
   }
 });
 
+// Get single variant by ID (for order display)
+app.get('/api/admin/variants/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const variant = await Variant.findById(id).lean();
+    if (!variant) return res.status(404).json({ error: 'Variant not found' });
+    return res.json({ ...variant, id: variant._id });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to fetch variant' });
+  }
+});
+
 app.post('/api/admin/products', async (req, res) => {
   try {
     const data = req.body;
@@ -404,50 +417,7 @@ app.post('/api/admin/products', async (req, res) => {
   }
 });
 
-app.patch('/api/admin/products/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const data = req.body;
 
-    // Update the product
-    await Product.findByIdAndUpdate(id, {
-      name: data.name,
-      description: data.description,
-      category: data.category,
-      image_url: data.image_url,
-      available_sizes: data.available_sizes || '[]',
-      is_active: data.is_active ? true : false,
-    });
-
-    // If available_sizes changed, update ALL variants to ONLY have the new sizes
-    if (data.available_sizes) {
-      try {
-        const newProductSizes = JSON.parse(data.available_sizes);
-
-        // Get all variants for this product
-        const variants = await Variant.find({ product: id });
-
-        console.log(`🔷 Updating ${variants.length} variants with new sizes:`, newProductSizes);
-
-        // Update each variant - REPLACE their sizes with the new product sizes
-        for (const variant of variants) {
-          await Variant.findByIdAndUpdate(variant._id, {
-            available_sizes: JSON.stringify(newProductSizes)
-          });
-        }
-
-        console.log(`✅ Updated sizes for ${variants.length} variants of product ${id}`);
-      } catch (parseError) {
-        console.error('❌ Error parsing/updating variant sizes:', parseError);
-      }
-    }
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Failed to update product' });
-  }
-});
 // Add this NEW endpoint for updating variants
 app.patch('/api/admin/variants/:id', async (req, res) => {
   try {
