@@ -1,21 +1,39 @@
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, SlidersHorizontal } from "lucide-react";
 import Navbar from "@/react-app/components/Navbar";
 import ProductCard from "@/react-app/components/ProductCard";
 import OrderModal from "@/react-app/components/OrderModal";
 import type { Product } from "@/shared/types";
 
+interface ProductWithVariants extends Product {
+  variants?: Array<{
+    color: string;
+    selling_price: number;
+  }>;
+}
+
 export default function HomePage() {
   const API_BASE = import.meta.env.VITE_API_BASE || "";
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductWithVariants[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<ProductWithVariants[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [filterLoading, setFilterLoading] = useState(false);
+  
+  // Filter states
+  const [selectedColor, setSelectedColor] = useState("all");
+  const [availableColors, setAvailableColors] = useState<string[]>([]);
+  const [priceRange, setPriceRange] = useState<string>("all");
 
   useEffect(() => {
     fetchProducts();
   }, [selectedCategory]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [products, selectedColor, priceRange]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -25,12 +43,69 @@ export default function HomePage() {
         : `${API_BASE}/api/products?category=${selectedCategory}`;
       const res = await fetch(url);
       const data = await res.json();
-      setProducts(data);
+      
+      // Fetch variants for all products at once
+      const productsWithVariants = await Promise.all(
+        data.map(async (product: Product) => {
+          try {
+            const variantsRes = await fetch(`${API_BASE}/api/products/${product.id}/variants`);
+            const variants = await variantsRes.json();
+            return { ...product, variants };
+          } catch (err) {
+            console.error("Error fetching variants:", err);
+            return { ...product, variants: [] };
+          }
+        })
+      );
+      
+      setProducts(productsWithVariants);
+      
+      // Extract unique colors from all variants
+      const colors = new Set<string>();
+      productsWithVariants.forEach((product) => {
+        product.variants?.forEach((v: { color: string; selling_price: number }) => colors.add(v.color));
+      });
+      setAvailableColors(Array.from(colors).sort());
     } catch (error) {
       console.error("Failed to fetch products:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    setFilterLoading(true);
+    
+    // Small delay to show loading state
+    setTimeout(() => {
+      let filtered = [...products];
+
+      // Filter by color
+      if (selectedColor !== "all") {
+        filtered = filtered.filter((product) =>
+          product.variants?.some((v) => v.color === selectedColor)
+        );
+      }
+
+      // Filter by price range
+      if (priceRange !== "all") {
+        filtered = filtered.filter((product) => {
+          if (!product.variants || product.variants.length === 0) return false;
+          
+          const prices = product.variants.map((v) => v.selling_price);
+          const minPrice = Math.min(...prices);
+          
+          if (priceRange === "under2000") return minPrice < 2000;
+          if (priceRange === "2000-4000") return minPrice >= 2000 && minPrice <= 4000;
+          if (priceRange === "over4000") return minPrice > 4000;
+          
+          return false;
+        });
+      }
+
+      setFilteredProducts(filtered);
+      setFilterLoading(false);
+    }, 300);
   };
 
   const handleOrderSubmit = async (orderData: {
@@ -72,6 +147,8 @@ export default function HomePage() {
     }
   };
 
+  const displayProducts = selectedColor === "all" && priceRange === "all" ? products : filteredProducts;
+
   return (
     <div className="min-h-screen bg-black">
       <Navbar
@@ -87,10 +164,67 @@ export default function HomePage() {
         )}
 
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">
-            {selectedCategory === "all" ? "All Products" : selectedCategory}
-          </h1>
-          <p className="text-gray-400">Browse our premium collection and place your order</p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2">
+                {selectedCategory === "all" ? "All Products" : selectedCategory}
+              </h1>
+              <p className="text-gray-400">Browse our premium collection and place your order</p>
+            </div>
+          </div>
+
+          {/* Subtle Filter Bar */}
+          <div className="flex items-center gap-4 mt-6 border-t border-gray-800 pt-4">
+            <div className="flex items-center gap-2 text-gray-500 text-sm">
+              <SlidersHorizontal size={16} />
+              <span>Filter:</span>
+            </div>
+
+            {/* Color Filter */}
+            <select
+              value={selectedColor}
+              onChange={(e) => setSelectedColor(e.target.value)}
+              className="bg-gray-900 text-gray-300 text-sm border border-gray-800 rounded px-3 py-1.5 focus:outline-none focus:border-green-500/50 transition-colors"
+              disabled={loading}
+            >
+              <option value="all">All Colors</option>
+              {availableColors.map((color) => (
+                <option key={color} value={color}>
+                  {color}
+                </option>
+              ))}
+            </select>
+
+            {/* Price Range Filter */}
+            <select
+              value={priceRange}
+              onChange={(e) => setPriceRange(e.target.value)}
+              className="bg-gray-900 text-gray-300 text-sm border border-gray-800 rounded px-3 py-1.5 focus:outline-none focus:border-green-500/50 transition-colors"
+              disabled={loading}
+            >
+              <option value="all">All Prices</option>
+              <option value="under2000">Under KSh 2,000</option>
+              <option value="2000-4000">KSh 2,000 - 4,000</option>
+              <option value="over4000">Over KSh 4,000</option>
+            </select>
+
+            {(selectedColor !== "all" || priceRange !== "all") && (
+              <button
+                onClick={() => {
+                  setSelectedColor("all");
+                  setPriceRange("all");
+                }}
+                className="text-gray-500 hover:text-gray-400 text-sm transition-colors"
+                disabled={loading}
+              >
+                Clear filters
+              </button>
+            )}
+
+            {filterLoading && (
+              <Loader2 className="w-4 h-4 text-green-500 animate-spin" />
+            )}
+          </div>
         </div>
 
         {loading ? (
@@ -98,13 +232,22 @@ export default function HomePage() {
             <Loader2 className="w-12 h-12 text-green-500 animate-spin mb-4" />
             <p className="text-gray-400 text-lg">Loading products...</p>
           </div>
-        ) : products.length === 0 ? (
+        ) : displayProducts.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-gray-400 text-lg">No products available in this category</p>
+            <p className="text-gray-400 text-lg">No products match your filters</p>
+            <button
+              onClick={() => {
+                setSelectedColor("all");
+                setPriceRange("all");
+              }}
+              className="text-green-400 hover:text-green-300 text-sm mt-2 transition-colors"
+            >
+              Clear filters
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
+            {displayProducts.map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
