@@ -63,7 +63,7 @@ export default function AdminLoginPage() {
         <div className="card p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-white font-medium mb-2">Username</label>
+              <label className="block text-white font-medium mb-2">password</label>
               <input
                 type="text"
                 value={username}
@@ -74,7 +74,7 @@ export default function AdminLoginPage() {
             </div>
 
             <div>
-              <label className="block text-white font-medium mb-2">Password</label>
+              <label className="block text-white font-medium mb-2">passkey</label>
               <input
                 type="password"
                 value={password}
