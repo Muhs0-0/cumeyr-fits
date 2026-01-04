@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Package, ShoppingBag, Plus, Pencil, Trash2, CheckCircle, XCircle, Clock, Layers, DollarSign, TrendingUp, AlertTriangle, Box, User, Filter } from "lucide-react";
+import { Package, ShoppingBag, Plus, Pencil, Trash2, CheckCircle, XCircle, Clock, Layers, DollarSign, TrendingUp, AlertTriangle, Box, User, Filter, Eye, Monitor, Smartphone, Globe, Activity, TrendingDown, Users } from "lucide-react";
 import ProductModal from "@/react-app/components/ProductModal";
 import ManageVariantsModal from "@/react-app/components/ManageVariantsModal";
 import type { Product, Order, Analytics } from "@/shared/types";
@@ -9,16 +9,17 @@ interface ExtendedOrder extends Order {
   cost_price?: number;
   selling_price?: number;
   profit?: number;
-  variant_image?: string; // NEW: Add variant image URL
-  variant_id?: string | number; // ADD: variant_id for fetching variant data
+  variant_image?: string;
+  variant_id?: string | number;
 }
 
 export default function AdminDashboardPage() {
   const API_BASE = import.meta.env.VITE_API_BASE || "";
-  const [activeTab, setActiveTab] = useState<"orders" | "products" | "inventory">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "products" | "visitors">("orders");
   const [orders, setOrders] = useState<ExtendedOrder[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [visitorAnalytics, setVisitorAnalytics] = useState<any>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<"all" | "approved" | "pending" | "cancelled">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showProductModal, setShowProductModal] = useState(false);
@@ -29,10 +30,8 @@ export default function AdminDashboardPage() {
   const [adminId, setAdminId] = useState("");
   const navigate = useNavigate();
 
-  // Get unique categories from products
   const categories = ["all", ...new Set(products.map(p => p.category).filter(Boolean))];
 
-  // Filter products by category
   const filteredProducts = products.filter(product => {
     if (categoryFilter === "all") return true;
     return product.category === categoryFilter;
@@ -56,10 +55,11 @@ export default function AdminDashboardPage() {
     setAdminName(name);
     setAdminId(id);
     
-    console.log("🔷 Fetching orders, products, and analytics");
+    console.log("🔷 Fetching orders, products, analytics, and visitor analytics");
     fetchOrders();
     fetchProducts();
     fetchAnalytics();
+    fetchVisitorAnalytics();
   }, [navigate]);
 
   const fetchOrders = async () => {
@@ -70,7 +70,6 @@ export default function AdminDashboardPage() {
       const data = await res.json();
       console.log("✅ Orders fetched:", data);
       
-      // Fetch variant images for each order
       const ordersWithImages = await Promise.all(
         data.map(async (order: ExtendedOrder) => {
           try {
@@ -115,6 +114,19 @@ export default function AdminDashboardPage() {
       setAnalytics(data);
     } catch (err) {
       console.error("❌ Error fetching analytics:", err);
+    }
+  };
+
+  const fetchVisitorAnalytics = async () => {
+    console.log("🔷 Fetching visitor analytics from API...");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/visits/analytics`);
+      console.log("🔷 Visitor analytics response status:", res.status);
+      const data = await res.json();
+      console.log("✅ Visitor analytics fetched:", data);
+      setVisitorAnalytics(data);
+    } catch (err) {
+      console.error("❌ Error fetching visitor analytics:", err);
     }
   };
 
@@ -326,6 +338,17 @@ export default function AdminDashboardPage() {
             <Package size={20} />
             Products
           </button>
+          <button
+            onClick={() => setActiveTab("visitors")}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
+              activeTab === "visitors"
+                ? "bg-gradient-to-r from-green-600 to-green-500 text-white shadow-lg shadow-green-500/30"
+                : "bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800"
+            }`}
+          >
+            <Eye size={20} />
+            Visitors
+          </button>
         </div>
 
         {activeTab === "orders" && (
@@ -347,9 +370,7 @@ export default function AdminDashboardPage() {
                   <div key={order.id} className="card">
                     <div className="p-6">
                       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                        {/* Order Image and Details */}
                         <div className="flex gap-4 flex-1">
-                          {/* Variant Image */}
                           {order.variant_image && (
                             <div className="flex-shrink-0">
                               <img
@@ -360,7 +381,6 @@ export default function AdminDashboardPage() {
                             </div>
                           )}
                           
-                          {/* Order Details */}
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <h3 className="text-lg font-semibold text-white">
@@ -464,7 +484,6 @@ export default function AdminDashboardPage() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1">
                 <h2 className="text-2xl font-bold text-white">Products Management</h2>
                 
-                {/* Category Filter */}
                 {categories.length > 1 && (
                   <div className="flex items-center gap-2">
                     <Filter size={18} className="text-gray-400" />
@@ -566,6 +585,259 @@ export default function AdminDashboardPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === "visitors" && visitorAnalytics && (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-white mb-6">Visitor Analytics</h2>
+
+            {/* Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-gradient-to-br from-purple-900/30 to-gray-900 rounded-lg p-6 border border-purple-500/30">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-gray-300 text-sm font-medium">Total Visits</h3>
+                  <Eye size={20} className="text-purple-400" />
+                </div>
+                <p className="text-3xl font-bold text-purple-400">
+                  {visitorAnalytics.total_visits.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">All time</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-blue-900/30 to-gray-900 rounded-lg p-6 border border-blue-500/30">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-gray-300 text-sm font-medium">Today</h3>
+                  <Activity size={20} className="text-blue-400" />
+                </div>
+                <p className="text-3xl font-bold text-blue-400">
+                  {visitorAnalytics.visits_today}
+                </p>
+                <div className="flex items-center gap-1 mt-1">
+                  {visitorAnalytics.growth_rate > 0 ? (
+                    <>
+                      <TrendingUp size={14} className="text-green-400" />
+                      <p className="text-xs text-green-400">+{visitorAnalytics.growth_rate}% vs yesterday</p>
+                    </>
+                  ) : visitorAnalytics.growth_rate < 0 ? (
+                    <>
+                      <TrendingDown size={14} className="text-red-400" />
+                      <p className="text-xs text-red-400">{visitorAnalytics.growth_rate}% vs yesterday</p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-500">Same as yesterday</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-cyan-900/30 to-gray-900 rounded-lg p-6 border border-cyan-500/30">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-gray-300 text-sm font-medium">Last 7 Days</h3>
+                  <Users size={20} className="text-cyan-400" />
+                </div>
+                <p className="text-3xl font-bold text-cyan-400">
+                  {visitorAnalytics.visits_last_7_days}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {visitorAnalytics.unique_visits_last_7_days} unique
+                </p>
+              </div>
+
+              <div className="bg-gradient-to-br from-green-900/30 to-gray-900 rounded-lg p-6 border border-green-500/30">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-gray-300 text-sm font-medium">Last 30 Days</h3>
+                  <Globe size={20} className="text-green-400" />
+                </div>
+                <p className="text-3xl font-bold text-green-400">
+                  {visitorAnalytics.visits_last_30_days}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Monthly traffic</p>
+              </div>
+            </div>
+
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="card p-6">
+                <h3 className="text-white font-semibold mb-4">Last 7 Days Trend</h3>
+                <div className="space-y-2">
+                  {visitorAnalytics.daily_visits.map((day: any) => (
+                    <div key={day._id} className="flex items-center gap-3">
+                      <span className="text-gray-400 text-sm w-24">
+                        {new Date(day._id).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                      <div className="flex-1 bg-gray-800 rounded-full h-6 relative overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-green-600 to-green-400 h-full rounded-full flex items-center justify-end pr-2"
+                          style={{
+                            width: `${(day.total / Math.max(...visitorAnalytics.daily_visits.map((d: any) => d.total))) * 100}%`
+                          }}
+                        >
+                          <span className="text-white text-xs font-medium">{day.total}</span>
+                        </div>
+                      </div>
+                      <span className="text-gray-500 text-xs w-16">{day.unique} unique</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="card p-6">
+                <h3 className="text-white font-semibold mb-4">Traffic Sources</h3>
+                <div className="space-y-3">
+                  {visitorAnalytics.traffic_sources.map((source: any) => (
+                    <div key={source._id} className="flex items-center justify-between">
+                      <span className="text-gray-300">{source._id}</span>
+                      <span className="text-green-400 font-semibold">{source.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Device & Browser Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="card p-6">
+                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                  <Monitor size={18} />
+                  Devices
+                </h3>
+                <div className="space-y-3">
+                  {visitorAnalytics.device_stats.map((device: any) => {
+                    const total = visitorAnalytics.device_stats.reduce((sum: number, d: any) => sum + d.count, 0);
+                    const percentage = ((device.count / total) * 100).toFixed(1);
+                    return (
+                      <div key={device._id}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-gray-300 capitalize">{device._id || 'Unknown'}</span>
+                          <span className="text-gray-400 text-sm">{percentage}%</span>
+                        </div>
+                        <div className="bg-gray-800 rounded-full h-2">
+                          <div
+                            className="bg-blue-500 h-2 rounded-full"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="card p-6">
+                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                  <Globe size={18} />
+                  Browsers
+                </h3>
+                <div className="space-y-3">
+                  {visitorAnalytics.browser_stats.slice(0, 5).map((browser: any) => {
+                    const total = visitorAnalytics.browser_stats.reduce((sum: number, b: any) => sum + b.count, 0);
+                    const percentage = ((browser.count / total) * 100).toFixed(1);
+                    return (
+                      <div key={browser._id}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-gray-300">{browser._id || 'Unknown'}</span>
+                          <span className="text-gray-400 text-sm">{percentage}%</span>
+                        </div>
+                        <div className="bg-gray-800 rounded-full h-2">
+                          <div
+                            className="bg-purple-500 h-2 rounded-full"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="card p-6">
+                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                  <Smartphone size={18} />
+                  Operating Systems
+                </h3>
+                <div className="space-y-3">
+                  {visitorAnalytics.os_stats.slice(0, 5).map((os: any) => {
+                    const total = visitorAnalytics.os_stats.reduce((sum: number, o: any) => sum + o.count, 0);
+                    const percentage = ((os.count / total) * 100).toFixed(1);
+                    return (
+                      <div key={os._id}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-gray-300">{os._id || 'Unknown'}</span>
+                          <span className="text-gray-400 text-sm">{percentage}%</span>
+                        </div>
+                        <div className="bg-gray-800 rounded-full h-2">
+                          <div
+                            className="bg-cyan-500 h-2 rounded-full"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Top Pages */}
+            <div className="card p-6">
+              <h3 className="text-white font-semibold mb-4">Top Pages (Last 7 Days)</h3>
+              <div className="space-y-2">
+                {visitorAnalytics.top_pages.map((page: any) => (
+                  <div key={page._id} className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
+                    <span className="text-gray-300">{page._id}</span>
+                    <span className="text-green-400 font-semibold">{page.count} visits</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Recent Visitors */}
+            <div className="card p-6">
+              <h3 className="text-white font-semibold mb-4">Recent Visitors</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-left text-gray-400 text-sm border-b border-gray-800">
+                      <th className="pb-3">Time</th>
+                      <th className="pb-3">Page</th>
+                      <th className="pb-3">Device</th>
+                      <th className="pb-3">Browser</th>
+                      <th className="pb-3">OS</th>
+                      <th className="pb-3">Source</th>
+                      <th className="pb-3">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visitorAnalytics.recent_visits.map((visit: any, idx: number) => (
+                      <tr key={idx} className="border-b border-gray-800/50 hover:bg-gray-900/30">
+                        <td className="py-3 text-gray-400 text-sm">
+                          {new Date(visit.timestamp).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </td>
+                        <td className="py-3 text-white text-sm">{visit.page_url}</td>
+                        <td className="py-3 text-gray-300 text-sm capitalize">{visit.device_type}</td>
+                        <td className="py-3 text-gray-300 text-sm">{visit.browser}</td>
+                        <td className="py-3 text-gray-300 text-sm">{visit.os}</td>
+                        <td className="py-3 text-gray-400 text-sm truncate max-w-[150px]">
+                          {visit.referrer === 'direct' ? 'Direct' : visit.referrer}
+                        </td>
+                        <td className="py-3">
+                          {visit.is_unique ? (
+                            <span className="px-2 py-1 bg-green-900/30 text-green-400 text-xs rounded">New</span>
+                          ) : (
+                            <span className="px-2 py-1 bg-gray-800 text-gray-400 text-xs rounded">Returning</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </div>

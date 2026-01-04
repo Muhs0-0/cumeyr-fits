@@ -9,6 +9,7 @@ const streamifier = require('streamifier');
 const Product = require('./models/Product');
 const Variant = require('./models/Variant');
 const Order = require('./models/Order');
+const Visit = require('./models/Visit');
 
 const app = express();
 app.use(cors({
@@ -49,6 +50,35 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'muhsoo123';
 const ADMIN2_USERNAME = process.env.ADMIN2_USERNAME || 'cumeyr';
 const ADMIN2_PASSWORD = process.env.ADMIN2_PASSWORD || 'cumeyr123';
 
+// Helper function to parse user agent
+function parseUserAgent(userAgent) {
+  const ua = userAgent.toLowerCase();
+  
+  // Detect browser
+  let browser = 'Unknown';
+  let browser_version = '';
+  if (ua.includes('chrome')) browser = 'Chrome';
+  else if (ua.includes('firefox')) browser = 'Firefox';
+  else if (ua.includes('safari')) browser = 'Safari';
+  else if (ua.includes('edge')) browser = 'Edge';
+  else if (ua.includes('opera')) browser = 'Opera';
+  
+  // Detect OS
+  let os = 'Unknown';
+  if (ua.includes('windows')) os = 'Windows';
+  else if (ua.includes('mac')) os = 'MacOS';
+  else if (ua.includes('linux')) os = 'Linux';
+  else if (ua.includes('android')) os = 'Android';
+  else if (ua.includes('ios') || ua.includes('iphone') || ua.includes('ipad')) os = 'iOS';
+  
+  // Detect device type
+  let device_type = 'desktop';
+  if (ua.includes('mobile')) device_type = 'mobile';
+  else if (ua.includes('tablet') || ua.includes('ipad')) device_type = 'tablet';
+  
+  return { browser, browser_version, os, device_type };
+}
+
 // Admin login
 app.post('/api/admin/login', (req, res) => {
   const { username, password } = req.body;
@@ -65,6 +95,206 @@ app.post('/api/admin/login', (req, res) => {
   }
   console.log('❌ [LOGIN] Failed - invalid credentials');
   return res.status(401).json({ success: false, message: 'Invalid credentials' });
+});
+
+// Track page visit with detailed analytics
+app.post('/api/track-visit', async (req, res) => {
+  try {
+    const { page_url, referrer, session_id, utm_source, utm_medium, utm_campaign } = req.body;
+    
+    const userAgent = req.headers['user-agent'];
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    
+    // Parse user agent for device/browser info
+    const deviceInfo = parseUserAgent(userAgent);
+    
+    // Check if this is a unique visitor (same IP in last 24 hours)
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const existingVisit = await Visit.findOne({
+      ip_address: ip,
+      timestamp: { $gte: yesterday }
+    });
+    
+    await Visit.create({
+      ip_address: ip,
+      user_agent: userAgent,
+      page_url: page_url || '/',
+      referrer: referrer || 'direct',
+      session_id: session_id || null,
+      is_unique: !existingVisit,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      ...deviceInfo
+    });
+    
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Visit tracking error:', err);
+    return res.json({ success: false });
+  }
+});
+
+// Get comprehensive visit analytics
+app.get('/api/admin/visits/analytics', async (req, res) => {
+  try {
+    // Time periods
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Basic counts
+    const totalVisits = await Visit.countDocuments();
+    const visitsToday = await Visit.countDocuments({ timestamp: { $gte: todayStart } });
+    const visitsYesterday = await Visit.countDocuments({
+      timestamp: { $gte: yesterdayStart, $lt: todayStart }
+    });
+    const visitsLast7Days = await Visit.countDocuments({ timestamp: { $gte: last7Days } });
+    const visitsLast30Days = await Visit.countDocuments({ timestamp: { $gte: last30Days } });
+    
+    // Unique visitors
+    const uniqueVisitsToday = await Visit.countDocuments({
+      timestamp: { $gte: todayStart },
+      is_unique: true
+    });
+    const uniqueVisitsLast7Days = await Visit.countDocuments({
+      timestamp: { $gte: last7Days },
+      is_unique: true
+    });
+
+    // Page views breakdown
+    const topPages = await Visit.aggregate([
+      { $match: { timestamp: { $gte: last7Days } } },
+      { $group: { _id: '$page_url', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]);
+
+    // Device breakdown
+    const deviceStats = await Visit.aggregate([
+      { $match: { timestamp: { $gte: last7Days } } },
+      { $group: { _id: '$device_type', count: { $sum: 1 } } }
+    ]);
+
+    // Browser breakdown
+    const browserStats = await Visit.aggregate([
+      { $match: { timestamp: { $gte: last7Days } } },
+      { $group: { _id: '$browser', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    // OS breakdown
+    const osStats = await Visit.aggregate([
+      { $match: { timestamp: { $gte: last7Days } } },
+      { $group: { _id: '$os', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Traffic sources (referrer analysis)
+    const trafficSources = await Visit.aggregate([
+      { $match: { timestamp: { $gte: last7Days } } },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ['$referrer', 'direct'] },
+              'Direct Traffic',
+              {
+                $cond: [
+                  { $regexMatch: { input: '$referrer', regex: 'google' } },
+                  'Google',
+                  {
+                    $cond: [
+                      { $regexMatch: { input: '$referrer', regex: 'facebook' } },
+                      'Facebook',
+                      {
+                        $cond: [
+                          { $regexMatch: { input: '$referrer', regex: 'instagram' } },
+                          'Instagram',
+                          {
+                            $cond: [
+                              { $regexMatch: { input: '$referrer', regex: 'twitter|x.com' } },
+                              'Twitter/X',
+                              'Other Referrals'
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Hourly visits for today (for chart)
+    const hourlyVisitsToday = await Visit.aggregate([
+      { $match: { timestamp: { $gte: todayStart } } },
+      {
+        $group: {
+          _id: { $hour: '$timestamp' },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Daily visits for last 7 days (for chart)
+    const dailyVisits = await Visit.aggregate([
+      { $match: { timestamp: { $gte: last7Days } } },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$timestamp' }
+          },
+          total: { $sum: 1 },
+          unique: { $sum: { $cond: ['$is_unique', 1, 0] } }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Recent visitors (last 20)
+    const recentVisits = await Visit.find()
+      .sort({ timestamp: -1 })
+      .limit(20)
+      .select('ip_address page_url referrer timestamp browser os device_type is_unique')
+      .lean();
+
+    // Calculate growth rate (today vs yesterday)
+    const growthRate = visitsYesterday > 0 
+      ? ((visitsToday - visitsYesterday) / visitsYesterday * 100).toFixed(1)
+      : visitsToday > 0 ? 100 : 0;
+
+    return res.json({
+      total_visits: totalVisits,
+      visits_today: visitsToday,
+      visits_yesterday: visitsYesterday,
+      visits_last_7_days: visitsLast7Days,
+      visits_last_30_days: visitsLast30Days,
+      unique_visits_today: uniqueVisitsToday,
+      unique_visits_last_7_days: uniqueVisitsLast7Days,
+      growth_rate: parseFloat(growthRate),
+      top_pages: topPages,
+      device_stats: deviceStats,
+      browser_stats: browserStats,
+      os_stats: osStats,
+      traffic_sources: trafficSources,
+      hourly_visits_today: hourlyVisitsToday,
+      daily_visits: dailyVisits,
+      recent_visits: recentVisits
+    });
+  } catch (err) {
+    console.error('Error fetching visit analytics:', err);
+    return res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
 });
 
 // Upload endpoint - NOW USING CLOUDINARY

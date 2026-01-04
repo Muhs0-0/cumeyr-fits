@@ -12,6 +12,25 @@ interface ProductWithVariants extends Product {
   }>;
 }
 
+// Helper functions for tracking
+function getSessionId() {
+  let sessionId = sessionStorage.getItem('visitor_session_id');
+  if (!sessionId) {
+    sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    sessionStorage.setItem('visitor_session_id', sessionId);
+  }
+  return sessionId;
+}
+
+function getUTMParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    utm_source: params.get('utm_source') || undefined,
+    utm_medium: params.get('utm_medium') || undefined,
+    utm_campaign: params.get('utm_campaign') || undefined
+  };
+}
+
 export default function HomePage() {
   const API_BASE = import.meta.env.VITE_API_BASE || "";
   const [products, setProducts] = useState<ProductWithVariants[]>([]);
@@ -26,6 +45,31 @@ export default function HomePage() {
   const [selectedColor, setSelectedColor] = useState("all");
   const [availableColors, setAvailableColors] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<string>("all");
+
+  // Track visitor on page load
+  useEffect(() => {
+    const trackVisit = async () => {
+      try {
+        const sessionId = getSessionId();
+        const utmParams = getUTMParams();
+        
+        await fetch(`${API_BASE}/api/track-visit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            page_url: window.location.pathname,
+            referrer: document.referrer || 'direct',
+            session_id: sessionId,
+            ...utmParams
+          })
+        });
+      } catch (err) {
+        console.error('Visit tracking failed:', err);
+      }
+    };
+
+    trackVisit();
+  }, []);
 
   useEffect(() => {
     fetchProducts();
@@ -225,6 +269,15 @@ export default function HomePage() {
               <Loader2 className="w-4 h-4 text-green-500 animate-spin" />
             )}
           </div>
+
+          {/* Info notice when color filter is active */}
+          {selectedColor !== "all" && !loading && displayProducts.length > 0 && (
+            <div className="mt-4 bg-blue-900/10 border border-blue-500/20 rounded-lg p-3">
+              <p className="text-blue-400 text-sm">
+                ℹ️ Products shown have <strong>{selectedColor}</strong> available. Click on any product to see all color options.
+              </p>
+            </div>
+          )}
         </div>
 
         {loading ? (
