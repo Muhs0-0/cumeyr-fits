@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, AlertTriangle, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
+import { X, AlertTriangle, ChevronLeft, ChevronRight, Maximize2, Loader2 } from "lucide-react";
 import type { Product, ProductVariant } from "@/shared/types";
 
 interface OrderModalProps {
@@ -13,6 +13,7 @@ interface OrderModalProps {
     country: string;
     variant_id: number;
   }) => void;
+  isSubmitting?: boolean;
 }
 
 const KENYAN_COUNTIES = [
@@ -78,7 +79,7 @@ const validatePhoneNumber = (phone: string): boolean => {
   return phoneRegex.test(cleaned);
 };
 
-export default function OrderModal({ product, onClose, onSubmit }: OrderModalProps) {
+export default function OrderModal({ product, onClose, onSubmit, isSubmitting = false }: OrderModalProps) {
   const API_BASE = import.meta.env.VITE_API_BASE || "";
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [selectedSize, setSelectedSize] = useState("");
@@ -382,37 +383,57 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
                         <p className="text-yellow-400 text-sm">No colors available for this product.</p>
                       </div>
                     ) : availableColors.length === 1 ? (
-                      <div className="bg-gray-800 rounded-lg p-3 border border-green-500/30">
-                        <p className="text-white">Color: <span className="text-green-400 font-medium">{availableColors[0]}</span></p>
+                      <div className="bg-gray-800 rounded-lg p-3 border border-green-500/30 flex items-center gap-4">
+                        <div className="flex-1">
+                          <p className="text-white">Color: <span className="text-green-400 font-medium">{availableColors[0]}</span></p>
+                        </div>
+                        {selectedVariant?.image_url && (
+                          <img 
+                            src={selectedVariant.image_url} 
+                            alt={availableColors[0]} 
+                            className="w-16 h-16 object-cover rounded"
+                          />
+                        )}
                       </div>
                     ) : (
-                      <select
-                        value={selectedColor}
-                        onChange={(e) => {
-                          const newColor = e.target.value;
-                          setSelectedColor(newColor);
-                          setSelectedSize(""); // Reset size when color changes
-                          setQuantity(1); // Reset quantity
-                          
-                          // Update image to match the selected color
-                          const matchingVariant = variants.find((v) => v.color === newColor);
-                          if (matchingVariant?.image_url) {
-                            const imageIndex = allImages.indexOf(matchingVariant.image_url);
-                            if (imageIndex !== -1) {
-                              setCurrentImageIndex(imageIndex);
-                            }
-                          }
-                        }}
-                        className="input-field w-full"
-                        required
-                      >
-                        <option value="">Select color</option>
-                        {availableColors.map((color) => (
-                          <option key={color} value={color}>
-                            {color}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="space-y-2">
+                        {availableColors.map((color) => {
+                          const matchingVariant = variants.find((v) => v.color === color);
+                          return (
+                            <div
+                              key={color}
+                              onClick={() => {
+                                setSelectedColor(color);
+                                setSelectedSize("");
+                                setQuantity(1);
+                                const matchingVariant = variants.find((v) => v.color === color);
+                                if (matchingVariant?.image_url) {
+                                  const imageIndex = allImages.indexOf(matchingVariant.image_url);
+                                  if (imageIndex !== -1) {
+                                    setCurrentImageIndex(imageIndex);
+                                  }
+                                }
+                              }}
+                              className={`p-3 rounded-lg border-2 cursor-pointer transition-all flex items-center gap-3 ${
+                                selectedColor === color
+                                  ? 'border-green-500 bg-green-900/20'
+                                  : 'border-gray-700 bg-gray-800 hover:border-gray-600'
+                              }`}
+                            >
+                              <div className="flex-1">
+                                <p className="text-white font-medium">{color}</p>
+                              </div>
+                              {matchingVariant?.image_url && (
+                                <img 
+                                  src={matchingVariant.image_url} 
+                                  alt={color} 
+                                  className="w-14 h-14 object-cover rounded"
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
 
@@ -559,11 +580,12 @@ export default function OrderModal({ product, onClose, onSubmit }: OrderModalPro
 
               <button
                 type="submit"
-                disabled={variantsLoading || loading || variants.length === 0 || availableColors.length === 0 || !selectedColor || availableSizes.length === 0 || !selectedVariant || stockQuantity === 0 || !!phoneError}
-                className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-lg shadow-green-500/30 w-full mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={variantsLoading || loading || isSubmitting || variants.length === 0 || availableColors.length === 0 || !selectedColor || availableSizes.length === 0 || !selectedVariant || stockQuantity === 0 || !!phoneError}
+                className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-lg shadow-green-500/30 w-full mt-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
+                {variantsLoading || loading || isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
                 {variantsLoading ? "Loading..." :
-                 loading ? "Placing Order..." : 
+                 loading || isSubmitting ? "Placing Order..." : 
                  variants.length === 0 ? "No Variants Available" : 
                  stockQuantity === 0 ? "Out of Stock" :
                  "Place Order"}

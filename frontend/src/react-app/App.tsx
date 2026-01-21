@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router";
 import HomePage from "@/react-app/pages/Home";
 import AdminLoginPage from "@/react-app/pages/AdminLogin";
 import AdminDashboardPage from "@/react-app/pages/AdminDashboard";
+import ProductDetailPage from "@/react-app/pages/ProductDetail";
 
 console.log("🔷 App.tsx loaded - Initializing routes");
 
@@ -11,6 +12,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/product/:productName" element={<ProductDetailPage />} />
         <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
       </Routes>

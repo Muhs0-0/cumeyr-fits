@@ -29,7 +29,12 @@ const visitSchema = new mongoose.Schema({
   // UTM parameters for marketing tracking
   utm_source: String,
   utm_medium: String,
-  utm_campaign: String
+  utm_campaign: String,
+  
+  // Product tracking (for product clicks)
+  product_id: Number,
+  product_name: String,
+  product_image_url: String
 });
 
 // Index for faster queries

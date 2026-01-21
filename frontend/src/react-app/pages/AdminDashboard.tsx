@@ -20,6 +20,10 @@ export default function AdminDashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [visitorAnalytics, setVisitorAnalytics] = useState<any>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [visitorAnalyticsLoading, setVisitorAnalyticsLoading] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(true);
   const [orderStatusFilter, setOrderStatusFilter] = useState<"all" | "approved" | "pending" | "cancelled">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showProductModal, setShowProductModal] = useState(false);
@@ -63,6 +67,7 @@ export default function AdminDashboardPage() {
   }, [navigate]);
 
   const fetchOrders = async () => {
+    setOrdersLoading(true);
     console.log("🔷 Fetching orders from API...");
     try {
       const res = await fetch(`${API_BASE}/api/admin/orders`);
@@ -88,10 +93,13 @@ export default function AdminDashboardPage() {
       setOrders(ordersWithImages);
     } catch (err) {
       console.error("❌ Error fetching orders:", err);
+    } finally {
+      setOrdersLoading(false);
     }
   };
 
   const fetchProducts = async () => {
+    setProductsLoading(true);
     console.log("🔷 Fetching products from API...");
     try {
       const res = await fetch(`${API_BASE}/api/admin/products`);
@@ -101,10 +109,13 @@ export default function AdminDashboardPage() {
       setProducts(data);
     } catch (err) {
       console.error("❌ Error fetching products:", err);
+    } finally {
+      setProductsLoading(false);
     }
   };
 
   const fetchAnalytics = async () => {
+    setAnalyticsLoading(true);
     console.log("🔷 Fetching analytics from API...");
     try {
       const res = await fetch(`${API_BASE}/api/admin/analytics`);
@@ -114,10 +125,13 @@ export default function AdminDashboardPage() {
       setAnalytics(data);
     } catch (err) {
       console.error("❌ Error fetching analytics:", err);
+    } finally {
+      setAnalyticsLoading(false);
     }
   };
 
   const fetchVisitorAnalytics = async () => {
+    setVisitorAnalyticsLoading(true);
     console.log("🔷 Fetching visitor analytics from API...");
     try {
       const res = await fetch(`${API_BASE}/api/admin/visits/analytics`);
@@ -127,6 +141,8 @@ export default function AdminDashboardPage() {
       setVisitorAnalytics(data);
     } catch (err) {
       console.error("❌ Error fetching visitor analytics:", err);
+    } finally {
+      setVisitorAnalyticsLoading(false);
     }
   };
 
@@ -207,7 +223,31 @@ export default function AdminDashboardPage() {
 
       <div className="container mx-auto px-4 py-8">
         {/* Analytics Section */}
-        {analytics && (
+        {analyticsLoading ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg p-6 border border-gray-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="h-4 w-24 bg-gray-700 rounded animate-pulse"></div>
+                    <div className="h-5 w-5 bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-8 w-32 bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-40 bg-gray-700 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-8">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg p-4 border border-gray-800 aspect-square">
+                  <div className="h-5 w-5 bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-16 bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-6 w-12 bg-gray-700 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : analytics && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div className="bg-gradient-to-br from-green-900/30 to-gray-900 rounded-lg p-6 hover:shadow-xl hover:shadow-green-500/20 transition-all border border-green-500/30">
@@ -354,7 +394,19 @@ export default function AdminDashboardPage() {
         {activeTab === "orders" && (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-white mb-6">Orders Management</h2>
-            {orders.length === 0 ? (
+            {ordersLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="card p-6 bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-800">
+                    <div className="grid grid-cols-6 gap-4">
+                      {[1, 2, 3, 4, 5, 6].map((j) => (
+                        <div key={j} className="h-10 bg-gray-700 rounded animate-pulse"></div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : orders.length === 0 ? (
               <div className="card p-8 text-center">
                 <p className="text-gray-400">No orders yet</p>
               </div>
@@ -490,7 +542,8 @@ export default function AdminDashboardPage() {
                     <select
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-green-500 transition-colors"
+                      className="bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-green-500 transition-colors disabled:opacity-50"
+                      disabled={productsLoading}
                     >
                       {categories.map((category) => (
                         <option key={category} value={category}>
@@ -498,7 +551,7 @@ export default function AdminDashboardPage() {
                         </option>
                       ))}
                     </select>
-                    {categoryFilter !== "all" && (
+                    {categoryFilter !== "all" && !productsLoading && (
                       <span className="text-gray-400 text-sm">
                         ({filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'})
                       </span>
@@ -509,14 +562,32 @@ export default function AdminDashboardPage() {
               
               <button
                 onClick={handleAddProduct}
-                className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-medium py-3 px-6 rounded-lg transition-all shadow-lg shadow-green-500/30 flex items-center gap-2"
+                disabled={productsLoading}
+                className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-medium py-3 px-6 rounded-lg transition-all shadow-lg shadow-green-500/30 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus size={20} />
                 Add Product
               </button>
             </div>
             
-            {filteredProducts.length === 0 ? (
+            {productsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="card">
+                    <div className="w-full h-48 bg-gray-700 animate-pulse"></div>
+                    <div className="p-4 space-y-3">
+                      <div className="h-5 w-32 bg-gray-700 rounded animate-pulse"></div>
+                      <div className="h-4 w-24 bg-gray-700 rounded animate-pulse"></div>
+                      <div className="h-4 w-full bg-gray-700 rounded animate-pulse"></div>
+                      <div className="flex gap-2 mt-4">
+                        <div className="h-10 flex-1 bg-gray-700 rounded animate-pulse"></div>
+                        <div className="h-10 flex-1 bg-gray-700 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredProducts.length === 0 ? (
               <div className="col-span-full bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg p-12 text-center border border-gray-800">
                 <Package size={48} className="mx-auto mb-4 text-gray-600" />
                 {categoryFilter === "all" ? (
@@ -588,12 +659,41 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {activeTab === "visitors" && visitorAnalytics && (
+        {activeTab === "visitors" && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white mb-6">Visitor Analytics</h2>
 
-            {/* Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {visitorAnalyticsLoading ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg p-6 border border-gray-800">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="h-4 w-24 bg-gray-700 rounded animate-pulse"></div>
+                        <div className="h-5 w-5 bg-gray-700 rounded animate-pulse"></div>
+                      </div>
+                      <div className="h-8 w-32 bg-gray-700 rounded animate-pulse mb-2"></div>
+                      <div className="h-3 w-20 bg-gray-700 rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="card p-6">
+                      <div className="h-5 w-32 bg-gray-700 rounded animate-pulse mb-4"></div>
+                      <div className="space-y-2">
+                        {[1, 2, 3, 4, 5].map((j) => (
+                          <div key={j} className="h-6 bg-gray-700 rounded animate-pulse"></div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : visitorAnalytics ? (
+              <>
+                {/* Overview Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-gradient-to-br from-purple-900/30 to-gray-900 rounded-lg p-6 border border-purple-500/30">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-gray-300 text-sm font-medium">Total Visits</h3>
@@ -799,6 +899,7 @@ export default function AdminDashboardPage() {
                   <thead>
                     <tr className="text-left text-gray-400 text-sm border-b border-gray-800">
                       <th className="pb-3">Time</th>
+                      <th className="pb-3">Product</th>
                       <th className="pb-3">Page</th>
                       <th className="pb-3">Device</th>
                       <th className="pb-3">Browser</th>
@@ -817,6 +918,20 @@ export default function AdminDashboardPage() {
                             hour: '2-digit',
                             minute: '2-digit'
                           })}
+                        </td>
+                        <td className="py-3">
+                          {visit.product_image_url ? (
+                            <div className="flex items-center gap-2">
+                              <img 
+                                src={visit.product_image_url} 
+                                alt={visit.product_name}
+                                className="w-8 h-8 rounded object-cover"
+                              />
+                              <span className="text-white text-sm max-w-[150px] truncate">{visit.product_name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-500 text-sm">-</span>
+                          )}
                         </td>
                         <td className="py-3 text-white text-sm">{visit.page_url}</td>
                         <td className="py-3 text-gray-300 text-sm capitalize">{visit.device_type}</td>
@@ -838,6 +953,12 @@ export default function AdminDashboardPage() {
                 </table>
               </div>
             </div>
+              </>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-400">No visitor data available</p>
+              </div>
+            )}
           </div>
         )}
       </div>

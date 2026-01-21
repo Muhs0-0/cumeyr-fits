@@ -104,12 +104,42 @@ export default function HomePage() {
       
       setProducts(productsWithVariants);
       
-      // Extract unique colors from all variants
-      const colors = new Set<string>();
+      // Extract and normalize colors from all variants
+      const colorSet = new Set<string>();
       productsWithVariants.forEach((product) => {
-        product.variants?.forEach((v: { color: string; selling_price: number }) => colors.add(v.color));
+        product.variants?.forEach((v: { color: string; selling_price: number }) => {
+          const color = v.color.toLowerCase();
+          
+          // Normalize multi-color variants to primary color
+          if (color.includes('white') && color.includes('black')) colorSet.add('Black & White');
+          else if (color.includes('x') || color.includes('+')) {
+            // Multi-color variants - extract primary colors
+            const colors = color.split(/[x+]/).map(c => c.trim());
+            colors.forEach(c => {
+              if (c) {
+                const normalized = c.charAt(0).toUpperCase() + c.slice(1);
+                colorSet.add(normalized);
+              }
+            });
+          } else {
+            // Single color - capitalize first letter
+            colorSet.add(color.charAt(0).toUpperCase() + color.slice(1));
+          }
+        });
       });
-      setAvailableColors(Array.from(colors).sort());
+      
+      // Sort colors with common ones first
+      const commonColors = ['Black', 'White', 'Brown', 'Blue', 'Red', 'Green', 'Orange', 'Purple', 'Yellow'];
+      const sortedColors = Array.from(colorSet).sort((a, b) => {
+        const aIndex = commonColors.indexOf(a);
+        const bIndex = commonColors.indexOf(b);
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+        if (aIndex !== -1) return -1;
+        if (bIndex !== -1) return 1;
+        return a.localeCompare(b);
+      });
+      
+      setAvailableColors(sortedColors);
     } catch (error) {
       console.error("Failed to fetch products:", error);
     } finally {
@@ -127,7 +157,14 @@ export default function HomePage() {
       // Filter by color
       if (selectedColor !== "all") {
         filtered = filtered.filter((product) =>
-          product.variants?.some((v) => v.color === selectedColor)
+          product.variants?.some((v) => {
+            const variantColor = v.color.toLowerCase();
+            const selectedColorLower = selectedColor.toLowerCase();
+            
+            // Check if variant color contains the selected color
+            return variantColor.includes(selectedColorLower) || 
+                   variantColor.split(/[x+]/).some(c => c.trim().toLowerCase() === selectedColorLower);
+          })
         );
       }
 
@@ -147,7 +184,12 @@ export default function HomePage() {
         });
       }
 
-      setFilteredProducts(filtered);
+      // Remove duplicates by product ID (just in case)
+      const uniqueFiltered = filtered.filter((product, index, self) =>
+        index === self.findIndex((p) => p.id === product.id)
+      );
+
+      setFilteredProducts(uniqueFiltered);
       setFilterLoading(false);
     }, 300);
   };

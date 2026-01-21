@@ -100,7 +100,7 @@ app.post('/api/admin/login', (req, res) => {
 // Track page visit with detailed analytics
 app.post('/api/track-visit', async (req, res) => {
   try {
-    const { page_url, referrer, session_id, utm_source, utm_medium, utm_campaign } = req.body;
+    const { page_url, referrer, session_id, utm_source, utm_medium, utm_campaign, product_id, product_name, product_image_url } = req.body;
     
     const userAgent = req.headers['user-agent'];
     const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -125,6 +125,9 @@ app.post('/api/track-visit', async (req, res) => {
       utm_source,
       utm_medium,
       utm_campaign,
+      product_id,
+      product_name,
+      product_image_url,
       ...deviceInfo
     });
     
@@ -132,6 +135,227 @@ app.post('/api/track-visit', async (req, res) => {
   } catch (err) {
     console.error('Visit tracking error:', err);
     return res.json({ success: false });
+  }
+});
+
+// Track Product View
+app.post('/api/track-product-view', async (req, res) => {
+  try {
+    const { product_id, product_name, product_image_url, product_category, session_id, utm_source, utm_medium, utm_campaign } = req.body;
+    
+    console.log('📍 Received product view track request:', { product_id, product_name, product_category });
+    
+    const userAgent = req.headers['user-agent'];
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    
+    // Parse user agent for device/browser info
+    const deviceInfo = parseUserAgent(userAgent);
+    
+    // Check if this is a unique viewer for this specific product (same IP in last 24 hours)
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const existingView = await ProductView.findOne({
+      product_id,
+      ip_address: ip,
+      timestamp: { $gte: yesterday }
+    });
+    
+    const productView = await ProductView.create({
+      product_id,
+      product_name,
+      product_image_url,
+      product_category,
+      ip_address: ip,
+      user_agent: userAgent,
+      session_id: session_id || null,
+      is_unique: !existingView,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      ...deviceInfo
+    });
+    
+    console.log('✅ Product view saved to DB:', productView._id);
+    return res.json({ success: true, id: productView._id });
+  } catch (err) {
+    console.error('❌ Product view tracking error:', err);
+    return res.json({ success: false, error: err.message });
+  }
+});
+
+// Get Product Analytics
+app.get('/api/admin/products/analytics', async (req, res) => {
+  try {
+    // Time periods
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    // Total views all time
+    const totalViews = await ProductView.countDocuments();
+    const totalUniqueViewers = await ProductView.countDocuments({ is_unique: true });
+    
+    // Views today
+    const viewsToday = await ProductView.countDocuments({
+      timestamp: { $gte: today }
+    });
+    
+    // Views yesterday
+    const viewsYesterday = await ProductView.countDocuments({
+      timestamp: { $gte: yesterday, $lt: today }
+    });
+    
+    // Growth rate
+    const growthRate = viewsYesterday > 0 ? Math.round(((viewsToday - viewsYesterday) / viewsYesterday) * 100) : 100;
+    
+    // Views last 7 days
+    const viewsLast7Days = await ProductView.countDocuments({
+      timestamp: { $gte: sevenDaysAgo }
+    });
+    
+    const uniqueViewsLast7Days = await ProductView.countDocuments({
+      timestamp: { $gte: sevenDaysAgo },
+      is_unique: true
+    });
+    
+    // Views last 30 days
+    const viewsLast30Days = await ProductView.countDocuments({
+      timestamp: { $gte: thirtyDaysAgo }
+    });
+    
+    // Daily trend for last 7 days
+    const dailyViews = await ProductView.aggregate([
+      {
+        $match: { timestamp: { $gte: sevenDaysAgo } }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$timestamp' }
+          },
+          total: { $sum: 1 },
+          unique: {
+            $sum: { $cond: ['$is_unique', 1, 0] }
+          }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    // Most viewed products
+    const mostViewedProducts = await ProductView.aggregate([
+      {
+        $group: {
+          _id: '$product_id',
+          product_name: { $first: '$product_name' },
+          product_image_url: { $first: '$product_image_url' },
+          product_category: { $first: '$product_category' },
+          view_count: { $sum: 1 },
+          unique_viewers: {
+            $sum: { $cond: ['$is_unique', 1, 0] }
+          }
+        }
+      },
+      { $sort: { view_count: -1 } },
+      { $limit: 10 }
+    ]);
+    
+    // Top viewers (IPs that viewed most products)
+    const topViewers = await ProductView.aggregate([
+      {
+        $group: {
+          _id: '$ip_address',
+          product_count: { $sum: 1 },
+          device_type: { $first: '$device_type' },
+          browser: { $first: '$browser' },
+          os: { $first: '$os' },
+          last_view: { $max: '$timestamp' }
+        }
+      },
+      { $sort: { product_count: -1 } },
+      { $limit: 10 }
+    ]);
+    
+    // Recent product views
+    const recentViews = await ProductView.find()
+      .sort({ timestamp: -1 })
+      .limit(20)
+      .lean();
+    
+    // Device stats
+    const deviceStats = await ProductView.aggregate([
+      {
+        $group: {
+          _id: '$device_type',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+    
+    // Browser stats
+    const browserStats = await ProductView.aggregate([
+      {
+        $group: {
+          _id: '$browser',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+    
+    // OS stats
+    const osStats = await ProductView.aggregate([
+      {
+        $group: {
+          _id: '$os',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+    
+    // Category stats
+    const categoryStats = await ProductView.aggregate([
+      {
+        $group: {
+          _id: '$product_category',
+          view_count: { $sum: 1 },
+          unique_viewers: {
+            $sum: { $cond: ['$is_unique', 1, 0] }
+          }
+        }
+      },
+      { $sort: { view_count: -1 } }
+    ]);
+    
+    return res.json({
+      total_views: totalViews,
+      total_unique_viewers: totalUniqueViewers,
+      views_today: viewsToday,
+      growth_rate: growthRate,
+      views_last_7_days: viewsLast7Days,
+      unique_views_last_7_days: uniqueViewsLast7Days,
+      views_last_30_days: viewsLast30Days,
+      daily_views: dailyViews,
+      most_viewed_products: mostViewedProducts,
+      top_viewers: topViewers,
+      recent_views: recentViews,
+      device_stats: deviceStats,
+      browser_stats: browserStats,
+      os_stats: osStats,
+      category_stats: categoryStats
+    });
+  } catch (err) {
+    console.error('Product analytics error:', err);
+    return res.json({ error: err.message });
   }
 });
 
@@ -145,7 +369,7 @@ app.get('/api/admin/visits/analytics', async (req, res) => {
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // Basic counts
+    // Basic counts (total page views)
     const totalVisits = await Visit.countDocuments();
     const visitsToday = await Visit.countDocuments({ timestamp: { $gte: todayStart } });
     const visitsYesterday = await Visit.countDocuments({
@@ -154,15 +378,20 @@ app.get('/api/admin/visits/analytics', async (req, res) => {
     const visitsLast7Days = await Visit.countDocuments({ timestamp: { $gte: last7Days } });
     const visitsLast30Days = await Visit.countDocuments({ timestamp: { $gte: last30Days } });
     
-    // Unique visitors
-    const uniqueVisitsToday = await Visit.countDocuments({
-      timestamp: { $gte: todayStart },
-      is_unique: true
-    });
-    const uniqueVisitsLast7Days = await Visit.countDocuments({
-      timestamp: { $gte: last7Days },
-      is_unique: true
-    });
+    // Unique visitors (count distinct session IDs)
+    const uniqueVisitsTodayData = await Visit.aggregate([
+      { $match: { timestamp: { $gte: todayStart }, session_id: { $ne: null } } },
+      { $group: { _id: '$session_id' } },
+      { $count: 'count' }
+    ]);
+    const uniqueVisitsToday = uniqueVisitsTodayData[0]?.count || 0;
+
+    const uniqueVisitsLast7DaysData = await Visit.aggregate([
+      { $match: { timestamp: { $gte: last7Days }, session_id: { $ne: null } } },
+      { $group: { _id: '$session_id' } },
+      { $count: 'count' }
+    ]);
+    const uniqueVisitsLast7Days = uniqueVisitsLast7DaysData[0]?.count || 0;
 
     // Page views breakdown
     const topPages = await Visit.aggregate([
@@ -247,7 +476,7 @@ app.get('/api/admin/visits/analytics', async (req, res) => {
     ]);
 
     // Daily visits for last 7 days (for chart)
-    const dailyVisits = await Visit.aggregate([
+    const dailyVisitsData = await Visit.aggregate([
       { $match: { timestamp: { $gte: last7Days } } },
       {
         $group: {
@@ -255,17 +484,37 @@ app.get('/api/admin/visits/analytics', async (req, res) => {
             $dateToString: { format: '%Y-%m-%d', date: '$timestamp' }
           },
           total: { $sum: 1 },
-          unique: { $sum: { $cond: ['$is_unique', 1, 0] } }
+          uniqueData: {
+            $push: {
+              $cond: [{ $ne: ['$session_id', null] }, '$session_id', null]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          total: 1,
+          unique: {
+            $size: {
+              $filter: {
+                input: '$uniqueData',
+                as: 'id',
+                cond: { $ne: ['$$id', null] }
+              }
+            }
+          }
         }
       },
       { $sort: { _id: 1 } }
     ]);
+    const dailyVisits = dailyVisitsData;
 
     // Recent visitors (last 20)
     const recentVisits = await Visit.find()
       .sort({ timestamp: -1 })
       .limit(20)
-      .select('ip_address page_url referrer timestamp browser os device_type is_unique')
+      .select('ip_address page_url referrer timestamp browser os device_type session_id')
       .lean();
 
     // Calculate growth rate (today vs yesterday)
